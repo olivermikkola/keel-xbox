@@ -80,7 +80,8 @@ KEEL_API int32_t KEEL_CALL keel_llama_load(
     llama_model_params mparams = llama_model_default_params();
     mparams.n_gpu_layers = 0;
     // Standard heap read stays AppContainer/WACK-clean on Xbox UWP
-    mparams.use_mmap = false;
+    mparams.load_mode = LLAMA_LOAD_MODE_NONE;
+    mparams.lazy_mode = LLAMA_LAZY_MODE_OFF;
 
     g_model = llama_model_load_from_file(target_path.c_str(), mparams);
     if (!g_model) {
