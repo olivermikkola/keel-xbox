@@ -20,15 +20,12 @@ export function useGamepadFocus({
   onActivate,
 }: Options) {
   const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    setIndex((i) => Math.min(i, Math.max(count - 1, 0)));
-  }, [count]);
+  const clampedIndex = Math.min(index, Math.max(count - 1, 0));
 
   const move = useCallback(
     (delta: number) => {
       if (count <= 0) return;
-      setIndex((i) => (i + delta + count) % count);
+      setIndex((i) => (Math.min(i, count - 1) + delta + count) % count);
     },
     [count],
   );
@@ -51,13 +48,13 @@ export function useGamepadFocus({
         move(-columns);
       } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        onActivate?.(index);
+        onActivate?.(clampedIndex);
       }
     };
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, move, columns, onActivate, index]);
+  }, [enabled, move, columns, onActivate, clampedIndex]);
 
-  return { index, setIndex };
+  return { index: clampedIndex, setIndex };
 }

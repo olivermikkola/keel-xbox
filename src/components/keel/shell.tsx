@@ -86,13 +86,18 @@ export function KeelShell() {
           <ModelsView
             active={view === "models"}
             selectedId={model.id}
-            onSelect={setModel}
+            onSelect={(next) => {
+              setModel(next);
+              setTps(null);
+              setGenerating(false);
+            }}
             onBack={() => setView("home")}
             onOpenConsole={() => setView("console")}
           />
         )}
         {view === "console" && (
           <ConsoleView
+            key={model.id}
             model={model}
             active={view === "console"}
             onBack={() => setView("home")}

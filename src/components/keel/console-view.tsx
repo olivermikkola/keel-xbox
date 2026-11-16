@@ -48,17 +48,7 @@ export function ConsoleView({
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    setMessages([
-      {
-        id: "sys",
-        role: "system",
-        content: `Loaded ${model.name} · ${backendLabel(model.backend)} · target ~${model.tokensPerSec} tok/s (Xbox Series S class estimate). This preview simulates local decode timing.`,
-      },
-    ]);
-    onStats({ tps: null, generating: false });
-  }, [model, onStats]);
+  const nextIdRef = useRef(0);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({
@@ -85,12 +75,13 @@ export function ConsoleView({
 
     setError(null);
     setInput("");
+    const seq = ++nextIdRef.current;
     const userMsg: Message = {
-      id: `u-${Date.now()}`,
+      id: `u-${seq}`,
       role: "user",
       content: trimmed,
     };
-    const assistantId = `a-${Date.now()}`;
+    const assistantId = `a-${seq}`;
     setMessages((prev) => [
       ...prev,
       userMsg,
