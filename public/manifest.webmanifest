@@ -4,8 +4,8 @@
   "description": "Local language models on Xbox — a 10-foot living-room AI console app.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0c1415",
-  "theme_color": "#0c1415",
+  "background_color": "#0a1112",
+  "theme_color": "#0a1112",
   "orientation": "landscape",
   "icons": [
     {

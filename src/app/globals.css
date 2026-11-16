@@ -36,17 +36,17 @@
 :root {
   --keel-ink: #0a1112;
   --keel-surface: #101a1c;
-  --keel-surface-raised: #162326;
+  --keel-surface-raised: #162426;
   --keel-paper: #f7f3e9;
-  --keel-foam: #eef3f2;
-  --keel-muted: #849694;
-  --keel-jade: #709c8f;
-  --keel-jade-bright: #acd0c0;
-  --keel-rust: #c77851;
-  --keel-rust-deep: #b66e4f;
-  --keel-accent: #a4cfc0;
-  --keel-accent-strong: #4d7c70;
-  --keel-accent-ink: #081210;
+  --keel-foam: #eef4f2;
+  --keel-muted: #8ca3a0;
+  --keel-jade: #36b394;
+  --keel-jade-bright: #76dfc2;
+  --keel-rust: #dc7648;
+  --keel-rust-deep: #8f4224;
+  --keel-accent: #76dfc2;
+  --keel-accent-strong: #36b394;
+  --keel-accent-ink: #0a1112;
   --keel-border: rgb(255 255 255 / 9%);
   --keel-border-strong: rgb(255 255 255 / 16%);
 
@@ -75,23 +75,23 @@
   --radius: 0.875rem;
 }
 
-/* Tone variant: Slate (matches Keel Desktop) vs deeper Ink */
+/* Tone variant: Slate (matches Keel Desktop) vs deeper canonical Ink */
 html[data-tone="slate"] {
   --keel-ink: #0c1415;
   --keel-surface: #141f21;
   --keel-surface-raised: #1a272a;
 }
 
-/* Accent variants: Sage | Copper | Ice */
+/* Accent variants: Sage (canonical Jade) | Copper (canonical Rust) | Ice */
 html[data-accent="copper"] {
-  --keel-accent: #dfa07c;
-  --keel-accent-strong: #9c6244;
+  --keel-accent: #f09467;
+  --keel-accent-strong: #dc7648;
   --keel-accent-ink: #160c07;
 }
 
 html[data-accent="ice"] {
-  --keel-accent: #a8cde8;
-  --keel-accent-strong: #4f7b9e;
+  --keel-accent: #8bc8f0;
+  --keel-accent-strong: #3f82b5;
   --keel-accent-ink: #07121b;
 }
 
