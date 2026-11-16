@@ -13,6 +13,7 @@ import { getActiveGamepadStatus, type GamepadStatus } from "@/lib/gamepad";
 import { KEEL_MODELS, getModel, type KeelModel, type RuntimeMode } from "@/lib/models";
 import {
   DEFAULT_SETTINGS,
+  REPORT_CATEGORY_LABELS,
   SSR_INITIAL_THREAD,
   applyThemeAttributes,
   createNewThread,
@@ -26,6 +27,7 @@ import {
   type ChatThread,
   type KeelSettings,
   type OutputReport,
+  type ReportCategory,
 } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { wllamaRuntime, type BrowserRuntimeState } from "@/lib/wllama-runtime";
@@ -184,7 +186,7 @@ export function KeelShell() {
   );
 
   const handleReportOutput = useCallback(
-    (msg: ChatMessage) => {
+    (msg: ChatMessage, category: ReportCategory, note?: string) => {
       const modelLabel =
         settings.runtimeMode === "local-server" && settings.serverModel
           ? settings.serverModel
@@ -194,7 +196,10 @@ export function KeelShell() {
         threadId: activeThread.id,
         messageId: msg.id,
         modelName: modelLabel,
-        reason: "User flagged via Console",
+        runtimeMode: settings.runtimeMode,
+        category,
+        reason: REPORT_CATEGORY_LABELS[category],
+        note: note?.trim() || undefined,
         excerpt: msg.content.slice(0, 160),
         createdAt: Date.now(),
       });
@@ -292,6 +297,7 @@ export function KeelShell() {
             runtimeMode={settings.runtimeMode}
             serverUrl={settings.serverUrl}
             serverModel={settings.serverModel}
+            serverPin={settings.serverPin}
             contextSize={settings.contextSize}
             onChangeRuntimeMode={(runtimeMode: RuntimeMode) =>
               updateSettings({ runtimeMode })
@@ -300,8 +306,12 @@ export function KeelShell() {
               updateSettings({ selectedModelId: next.id });
               setTps(null);
             }}
-            onUpdateServer={(serverUrl, serverModel) =>
-              updateSettings({ serverUrl, serverModel })
+            onUpdateServer={(serverUrl, serverModel, serverPin) =>
+              updateSettings({
+                serverUrl,
+                serverModel,
+                ...(serverPin !== undefined ? { serverPin } : {}),
+              })
             }
             onOpenConsole={() => setView("console")}
             onBack={() => setView("home")}
@@ -318,6 +328,7 @@ export function KeelShell() {
             loadedWasmLabel={wllamaState.loadedLabel}
             serverUrl={settings.serverUrl}
             serverModel={settings.serverModel}
+            serverPin={settings.serverPin}
             temperature={settings.temperature}
             maxTokens={settings.maxTokens}
             threads={threads}

@@ -18,6 +18,12 @@ type KeelNativeHostObject = {
   ListLocalModelsJson?: () => Promise<string> | string;
   StreamChat?: (requestJson: string) => Promise<string> | string;
   CancelChat?: () => Promise<void> | void;
+  DiscoverLanHostsJson?: () => Promise<string> | string;
+  ProbeLocalServerJson?: (
+    baseUrl: string,
+    pairingCode: string,
+  ) => Promise<string> | string;
+  StreamServerChat?: (requestJson: string) => Promise<string> | string;
 };
 
 declare global {
@@ -132,6 +138,112 @@ export async function streamUwpInference(
     ).catch((err: unknown) => {
       cleanup();
       reject(err instanceof Error ? err : new Error("Bridge call failed"));
+    });
+  });
+}
+
+export async function discoverUwpLanHosts(): Promise<unknown[]> {
+  if (!isUwpHostAvailable()) return [];
+  const bridge = window.chrome!.webview!.hostObjects!.keelBridge!;
+  if (!bridge.DiscoverLanHostsJson) return [];
+  try {
+    const raw = await bridge.DiscoverLanHostsJson();
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function probeUwpLocalServer(
+  baseUrl: string,
+  pairingCode = "",
+): Promise<{
+  ok: boolean;
+  flavor?: "ollama" | "openai";
+  latencyMs?: number;
+  models?: Array<{ id: string; sizeBytes?: number; flavor: "ollama" | "openai" }>;
+  requiresPin?: boolean;
+  error?: string;
+} | null> {
+  if (!isUwpHostAvailable()) return null;
+  const bridge = window.chrome!.webview!.hostObjects!.keelBridge!;
+  if (!bridge.ProbeLocalServerJson) return null;
+  try {
+    const raw = await bridge.ProbeLocalServerJson(baseUrl, pairingCode);
+    return JSON.parse(raw);
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "UWP server probe failed.",
+    };
+  }
+}
+
+export async function streamUwpServerChat(
+  payload: {
+    baseUrl: string;
+    pairingCode?: string;
+    model: string;
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+    temperature: number;
+    maxTokens: number;
+  },
+  handlers: {
+    onToken: (token: string) => void;
+    signal?: AbortSignal;
+  },
+): Promise<void> {
+  const webview = window.chrome?.webview;
+  const bridge = webview?.hostObjects?.keelBridge;
+  if (!bridge?.StreamServerChat) {
+    throw new Error("UWP LAN chat bridge is unavailable.");
+  }
+
+  const requestId = `lan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+  await new Promise<void>((resolve, reject) => {
+    const onMessage = (event: { data: unknown }) => {
+      try {
+        const msg =
+          typeof event.data === "string"
+            ? (JSON.parse(event.data) as Record<string, unknown>)
+            : (event.data as Record<string, unknown>);
+        if (!msg || msg.requestId !== requestId) return;
+        if (msg.type === "token" && typeof msg.token === "string") {
+          handlers.onToken(msg.token);
+        } else if (msg.type === "done") {
+          cleanup();
+          resolve();
+        } else if (msg.type === "error") {
+          cleanup();
+          reject(new Error(String(msg.error ?? "UWP LAN chat error")));
+        }
+      } catch (err) {
+        cleanup();
+        reject(err instanceof Error ? err : new Error("Invalid bridge message"));
+      }
+    };
+
+    const onAbort = () => {
+      void bridge.CancelChat?.();
+      cleanup();
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+
+    const cleanup = () => {
+      webview?.removeEventListener?.("message", onMessage);
+      handlers.signal?.removeEventListener("abort", onAbort);
+    };
+
+    webview?.addEventListener?.("message", onMessage);
+    handlers.signal?.addEventListener("abort", onAbort, { once: true });
+
+    Promise.resolve(
+      bridge.StreamServerChat!(JSON.stringify({ requestId, ...payload })),
+    ).catch((err: unknown) => {
+      cleanup();
+      reject(err instanceof Error ? err : new Error("UWP LAN bridge call failed"));
     });
   });
 }

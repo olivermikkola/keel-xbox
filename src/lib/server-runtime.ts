@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  discoverUwpLanHosts,
+  isUwpHostAvailable,
+  probeUwpLocalServer,
+  streamUwpServerChat,
+} from "@/lib/uwp-bridge";
+
 export type ServerModelInfo = {
   id: string;
   sizeBytes?: number;
@@ -11,14 +18,54 @@ export type ServerProbeResult = {
   flavor?: "ollama" | "openai";
   latencyMs?: number;
   models?: ServerModelInfo[];
+  requiresPin?: boolean;
   error?: string;
 };
 
-export async function probeLocalServer(baseUrl: string): Promise<ServerProbeResult> {
+export type DiscoveredLanHost = {
+  id: string;
+  name: string;
+  url: string;
+  kind: "keel-desktop" | "ollama" | "llama-server";
+  activeModel?: string | null;
+  runtimeState?: string;
+  pairingRequired: boolean;
+  latencyMs: number;
+};
+
+export async function discoverLanHosts(opts?: {
+  extraHost?: string;
+}): Promise<DiscoveredLanHost[]> {
+  if (isUwpHostAvailable()) {
+    const hosts = await discoverUwpLanHosts();
+    if (hosts.length > 0) {
+      return hosts as DiscoveredLanHost[];
+    }
+  }
+  const res = await fetch("/api/server/discover", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+  if (!res.ok) {
+    return [];
+  }
+  const json = (await res.json()) as { hosts?: DiscoveredLanHost[] };
+  return Array.isArray(json.hosts) ? json.hosts : [];
+}
+
+export async function probeLocalServer(
+  baseUrl: string,
+  pairingCode = "",
+): Promise<ServerProbeResult> {
+  if (isUwpHostAvailable()) {
+    const uwpRes = await probeUwpLocalServer(baseUrl, pairingCode);
+    if (uwpRes) return uwpRes;
+  }
   const res = await fetch("/api/server/models", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ baseUrl }),
+    body: JSON.stringify({ baseUrl, pairingCode }),
   });
   return (await res.json()) as ServerProbeResult;
 }
@@ -26,6 +73,7 @@ export async function probeLocalServer(baseUrl: string): Promise<ServerProbeResu
 export async function streamLocalServerChat(
   params: {
     baseUrl: string;
+    pairingCode?: string;
     model: string;
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
     temperature: number;
@@ -36,6 +84,11 @@ export async function streamLocalServerChat(
     signal?: AbortSignal;
   },
 ): Promise<void> {
+  if (isUwpHostAvailable()) {
+    await streamUwpServerChat(params, handlers);
+    return;
+  }
+
   const res = await fetch("/api/server/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

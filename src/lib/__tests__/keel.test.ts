@@ -9,6 +9,10 @@ import {
   getPreset,
   runtimeModeLabel,
 } from "../models.ts";
+import {
+  REPORT_CATEGORY_LABELS,
+  exportPolicy1116ReportsJson,
+} from "../settings.ts";
 
 test("validateLocalServerUrl accepts loopback, RFC1918 LAN, and mDNS", () => {
   assert.equal(validateLocalServerUrl("http://127.0.0.1:11434").hostname, "127.0.0.1");
@@ -36,4 +40,28 @@ test("model catalogue enforces Xbox 2 GB ceiling flags and presets", () => {
   assert.equal(getPreset("unknown-id").id, "general");
   assert.equal(formatBytes(229312224), "218.7 MiB");
   assert.equal(runtimeModeLabel("browser-wasm"), "On-Device WASM");
+});
+
+test("Store Policy 11.16 report export structures categories and omits network credentials", () => {
+  const payload = JSON.parse(
+    exportPolicy1116ReportsJson([
+      {
+        id: "rep-1",
+        threadId: "t-1",
+        messageId: "m-1",
+        modelName: "Bonsai 2 9B",
+        runtimeMode: "local-server",
+        category: "inaccurate",
+        reason: REPORT_CATEGORY_LABELS.inaccurate,
+        note: "Wrong date",
+        excerpt: "Test answer",
+        createdAt: 1700000000000,
+      },
+    ]),
+  );
+  assert.equal(payload.count, 1);
+  assert.equal(payload.reports[0].category, "inaccurate");
+  assert.equal(payload.reports[0].note, "Wrong date");
+  assert.equal("serverPin" in payload.reports[0], false);
+  assert.equal("serverUrl" in payload.reports[0], false);
 });

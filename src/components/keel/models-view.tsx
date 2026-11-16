@@ -14,7 +14,12 @@ import {
   type KeelModel,
   type RuntimeMode,
 } from "@/lib/models";
-import { probeLocalServer, type ServerModelInfo } from "@/lib/server-runtime";
+import {
+  discoverLanHosts,
+  probeLocalServer,
+  type DiscoveredLanHost,
+  type ServerModelInfo,
+} from "@/lib/server-runtime";
 import {
   getUwpSystemInfo,
   isUwpHostAvailable,
@@ -35,10 +40,11 @@ type Props = {
   runtimeMode: RuntimeMode;
   serverUrl: string;
   serverModel: string;
+  serverPin: string;
   contextSize: number;
   onChangeRuntimeMode: (mode: RuntimeMode) => void;
   onSelectModel: (model: KeelModel) => void;
-  onUpdateServer: (url: string, model: string) => void;
+  onUpdateServer: (url: string, model: string, pin?: string) => void;
   onOpenConsole: () => void;
   onBack: () => void;
   onPrevTab: () => void;
@@ -64,6 +70,7 @@ export function ModelsView({
   runtimeMode,
   serverUrl,
   serverModel,
+  serverPin,
   contextSize,
   onChangeRuntimeMode,
   onSelectModel,
@@ -85,9 +92,12 @@ export function ModelsView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [draftServerUrl, setDraftServerUrl] = useState(serverUrl);
+  const [draftServerPin, setDraftServerPin] = useState(serverPin);
   const [serverModels, setServerModels] = useState<ServerModelInfo[]>([]);
   const [serverProbeNote, setServerProbeNote] = useState<string | null>(null);
   const [probingServer, setProbingServer] = useState(false);
+  const [discoveredHosts, setDiscoveredHosts] = useState<DiscoveredLanHost[]>([]);
+  const [scanningLan, setScanningLan] = useState(false);
 
   const [uwpInfo, setUwpInfo] = useState<UwpSystemInfo | null>(null);
   const [uwpModels, setUwpModels] = useState<UwpLocalModelEntry[]>([]);
@@ -227,15 +237,21 @@ export function ModelsView({
     }
   }
 
-  async function handleProbeServer(targetUrl?: string) {
+  async function handleProbeServer(
+    targetUrl?: string,
+    overridePin?: string,
+    openOnSuccess = false,
+  ) {
     const url = (targetUrl ?? draftServerUrl).trim();
+    const pin = (overridePin ?? draftServerPin).trim();
     setDraftServerUrl(url);
+    setDraftServerPin(pin);
     setProbingServer(true);
     setErrorMsg(null);
     setServerProbeNote(null);
 
     try {
-      const result = await probeLocalServer(url);
+      const result = await probeLocalServer(url, pin);
       if (!result.ok) {
         setServerModels([]);
         setErrorMsg(result.error ?? "Server probe failed.");
@@ -248,13 +264,43 @@ export function ModelsView({
       );
       const nextModel =
         list.find((m) => m.id === serverModel)?.id ?? list[0]?.id ?? "";
-      onUpdateServer(url, nextModel);
+      onUpdateServer(url, nextModel, pin);
+      if (openOnSuccess && nextModel) {
+        onChangeRuntimeMode("local-server");
+        onOpenConsole();
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Could not reach server.",
       );
     } finally {
       setProbingServer(false);
+    }
+  }
+
+  async function handleScanLan() {
+    setScanningLan(true);
+    setErrorMsg(null);
+    try {
+      const hosts = await discoverLanHosts({
+        extraHost: draftServerUrl.trim() || undefined,
+      });
+      setDiscoveredHosts(hosts);
+      if (hosts.length === 0) {
+        setServerProbeNote(
+          "No Keel Desktop or local runners responded on LAN. Check that Share on LAN is enabled in Keel Desktop, or enter its IP below.",
+        );
+      } else {
+        setServerProbeNote(
+          `Found ${hosts.length} local host${hosts.length === 1 ? "" : "s"} on your LAN.`,
+        );
+      }
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "LAN discovery failed.",
+      );
+    } finally {
+      setScanningLan(false);
     }
   }
 
@@ -367,20 +413,75 @@ export function ModelsView({
         {runtimeMode === "local-server" ? (
           <div className="flex flex-col gap-4 pb-6">
             <div className="keel-card p-5">
-              <h3 className="text-base font-semibold text-[color:var(--keel-paper)]">
-                Connect Ollama, llama-server, or Keel Desktop
-              </h3>
-              <p className="mt-1 text-sm text-[color:var(--keel-muted)]">
-                Point Keel Console at a loopback or LAN server (e.g.{" "}
-                <code className="font-mono text-[color:var(--keel-foam)]">
-                  http://127.0.0.1:11434
-                </code>{" "}
-                for Ollama or{" "}
-                <code className="font-mono text-[color:var(--keel-foam)]">
-                  http://192.168.1.20:8080
-                </code>{" "}
-                on your gaming PC).
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-[color:var(--keel-paper)]">
+                    Pair with Keel Desktop or LAN Server
+                  </h3>
+                  <p className="mt-1 text-sm text-[color:var(--keel-muted)]">
+                    Discover a PC running <span className="text-[color:var(--keel-foam)]">Keel Desktop</span> (e.g.{" "}
+                    <code className="font-mono text-[color:var(--keel-foam)]">Bonsai 2 9B / 27B</code>) on your home Wi-Fi or Ethernet, or connect directly to Ollama /{" "}
+                    <code className="font-mono text-[color:var(--keel-foam)]">llama-server</code>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-keel-focus
+                  disabled={scanningLan}
+                  onClick={() => void handleScanLan()}
+                  className="h-11 rounded-full bg-[color:var(--keel-accent)] px-5 text-xs font-semibold text-[color:var(--keel-accent-ink)] disabled:opacity-50"
+                >
+                  {scanningLan ? "Scanning LAN…" : "Scan home LAN"}
+                </button>
+              </div>
+
+              {discoveredHosts.length > 0 && (
+                <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
+                  {discoveredHosts.map((host) => (
+                    <li key={host.id}>
+                      <button
+                        type="button"
+                        data-keel-focus
+                        onClick={() => {
+                          setDraftServerUrl(host.url);
+                          if (host.pairingRequired && !draftServerPin.trim()) {
+                            setErrorMsg(
+                              `Enter the 6-digit pairing PIN shown in ${host.name} below, then select Pair.`,
+                            );
+                            return;
+                          }
+                          void handleProbeServer(host.url, draftServerPin, true);
+                        }}
+                        className="keel-card-raised flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left hover:border-[color:var(--keel-accent)]"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="truncate text-sm font-semibold text-[color:var(--keel-paper)]">
+                              {host.name}
+                            </span>
+                            <Badge variant="outline" className="font-mono text-[10px]">
+                              {host.kind}
+                            </Badge>
+                            {host.pairingRequired && (
+                              <Badge className="bg-[color:var(--keel-rust)]/20 font-mono text-[10px] text-[color:var(--keel-rust)]">
+                                PIN
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 truncate font-mono text-xs text-[color:var(--keel-muted)]">
+                            {host.url}
+                            {host.activeModel ? ` · ${host.activeModel}` : ""}
+                            {` · ${host.latencyMs} ms`}
+                          </p>
+                        </div>
+                        <span className="shrink-0 font-mono text-[11px] text-[color:var(--keel-accent)] uppercase">
+                          Pair · A
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <input
@@ -388,8 +489,17 @@ export function ModelsView({
                   data-keel-focus
                   value={draftServerUrl}
                   onChange={(e) => setDraftServerUrl(e.target.value)}
-                  placeholder="http://127.0.0.1:11434"
+                  placeholder="http://192.168.1.20:18181"
                   className="h-12 flex-1 rounded-xl border border-white/15 bg-black/25 px-4 font-mono text-sm text-[color:var(--keel-foam)]"
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  data-keel-focus
+                  value={draftServerPin}
+                  onChange={(e) => setDraftServerPin(e.target.value)}
+                  placeholder="Pairing PIN (if set)"
+                  className="h-12 w-full rounded-xl border border-white/15 bg-black/25 px-4 font-mono text-sm text-[color:var(--keel-foam)] sm:w-44"
                 />
                 <button
                   type="button"
@@ -398,12 +508,13 @@ export function ModelsView({
                   onClick={() => void handleProbeServer()}
                   className="h-12 rounded-xl bg-[color:var(--keel-paper)] px-6 text-sm font-semibold text-[color:var(--keel-ink)] disabled:opacity-50"
                 >
-                  {probingServer ? "Probing…" : "Test & discover"}
+                  {probingServer ? "Probing…" : "Test & pair"}
                 </button>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {[
+                  ["Keel Desktop (18181)", "http://127.0.0.1:18181"],
                   ["Ollama (11434)", "http://127.0.0.1:11434"],
                   ["llama-server (8080)", "http://127.0.0.1:8080"],
                 ].map(([label, presetUrl]) => (
@@ -436,7 +547,7 @@ export function ModelsView({
                         type="button"
                         data-keel-focus
                         onClick={() => {
-                          onUpdateServer(draftServerUrl, sm.id);
+                          onUpdateServer(draftServerUrl, sm.id, draftServerPin.trim());
                           onChangeRuntimeMode("local-server");
                           onOpenConsole();
                         }}

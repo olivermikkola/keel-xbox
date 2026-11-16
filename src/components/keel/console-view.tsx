@@ -14,7 +14,12 @@ import {
   type KeelModel,
   type RuntimeMode,
 } from "@/lib/models";
-import type { ChatMessage, ChatThread } from "@/lib/settings";
+import {
+  REPORT_CATEGORY_LABELS,
+  type ChatMessage,
+  type ChatThread,
+  type ReportCategory,
+} from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -24,6 +29,7 @@ type Props = {
   loadedWasmLabel: string | null;
   serverUrl: string;
   serverModel: string;
+  serverPin: string;
   temperature: number;
   maxTokens: number;
   threads: ChatThread[];
@@ -34,7 +40,11 @@ type Props = {
   onUpdateThread: (thread: ChatThread) => void;
   onChangePreset: (presetId: string) => void;
   onSwitchToPreview: () => void;
-  onReportOutput: (msg: ChatMessage) => void;
+  onReportOutput: (
+    msg: ChatMessage,
+    category: ReportCategory,
+    note?: string,
+  ) => void;
   onBack: () => void;
   onOpenModels: () => void;
   onPrevTab: () => void;
@@ -76,6 +86,7 @@ export function ConsoleView({
   loadedWasmLabel,
   serverUrl,
   serverModel,
+  serverPin,
   temperature,
   maxTokens,
   threads,
@@ -103,6 +114,9 @@ export function ConsoleView({
   const [generating, setGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [reportedId, setReportedId] = useState<string | null>(null);
+  const [reportingMsg, setReportingMsg] = useState<ChatMessage | null>(null);
+  const [reportCategory, setReportCategory] = useState<ReportCategory>("inaccurate");
+  const [reportNote, setReportNote] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
 
   const preset = getPreset(activeThread.presetId);
@@ -206,6 +220,7 @@ export function ConsoleView({
         maxTokens,
         serverUrl,
         serverModel,
+        serverPin,
         signal: controller.signal,
         onToken: (token, stats) => {
           workingMessages = workingMessages.map((m) =>
@@ -285,6 +300,10 @@ export function ConsoleView({
             <span className="text-xs text-[color:var(--keel-muted)]">·</span>
             <span className="font-mono text-[11px] text-[color:var(--keel-accent)]">
               {runtimeModeLabel(runtimeMode)}
+            </span>
+            <span className="text-xs text-[color:var(--keel-muted)]">·</span>
+            <span className="rounded-full border border-white/12 px-2 py-0.5 font-mono text-[10px] text-[color:var(--keel-muted)]">
+              AI-generated · Policy 11.16
             </span>
           </div>
           <h2 className="mt-0.5 font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[color:var(--keel-paper)] sm:text-3xl">
@@ -546,12 +565,13 @@ export function ConsoleView({
                             type="button"
                             data-keel-focus
                             onClick={() => {
-                              onReportOutput(m);
-                              setReportedId(m.id);
+                              setReportingMsg(m);
+                              setReportCategory("inaccurate");
+                              setReportNote("");
                             }}
                             className="rounded-full border border-white/12 px-3 py-1 font-mono text-[10px] text-[color:var(--keel-muted)] hover:border-[color:var(--keel-rust)]/60 hover:text-[color:var(--keel-rust)]"
                           >
-                            {reportedId === m.id ? "Logged (11.16)" : "Flag output"}
+                            {reportedId === m.id ? "Reported (11.16)" : "Report output"}
                           </button>
                         </div>
                       )}
@@ -571,6 +591,73 @@ export function ConsoleView({
         >
           {error}
         </p>
+      )}
+
+      {reportingMsg && (
+        <div
+          role="dialog"
+          aria-label="Report AI Output (Store Policy 11.16)"
+          className="keel-card-raised mt-3 p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-mono text-xs tracking-[0.18em] text-[color:var(--keel-rust)] uppercase">
+              Report AI Output · Store Policy 11.16
+            </span>
+            <button
+              type="button"
+              data-keel-focus
+              onClick={() => setReportingMsg(null)}
+              className="rounded-full border border-white/15 px-3 py-1 font-mono text-[11px] text-[color:var(--keel-muted)]"
+            >
+              Cancel
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-[color:var(--keel-muted)]">
+            Choose what was wrong with this AI-generated reply. Reports stay on-device in Settings and can be exported without personal credentials.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(Object.keys(REPORT_CATEGORY_LABELS) as ReportCategory[]).map(
+              (cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  data-keel-focus
+                  onClick={() => setReportCategory(cat)}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-xs font-medium",
+                    reportCategory === cat
+                      ? "border-[color:var(--keel-rust)] bg-[color:var(--keel-rust)]/20 text-[color:var(--keel-paper)]"
+                      : "border-white/15 text-[color:var(--keel-muted)] hover:text-[color:var(--keel-foam)]",
+                  )}
+                >
+                  {REPORT_CATEGORY_LABELS[cat]}
+                </button>
+              ),
+            )}
+          </div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              data-keel-focus
+              value={reportNote}
+              onChange={(e) => setReportNote(e.target.value)}
+              placeholder="Optional note (stays local)…"
+              className="h-10 flex-1 rounded-xl border border-white/15 bg-black/25 px-3 text-xs text-[color:var(--keel-foam)]"
+            />
+            <button
+              type="button"
+              data-keel-focus
+              onClick={() => {
+                onReportOutput(reportingMsg, reportCategory, reportNote);
+                setReportedId(reportingMsg.id);
+                setReportingMsg(null);
+              }}
+              className="h-10 rounded-xl bg-[color:var(--keel-paper)] px-5 text-xs font-semibold text-[color:var(--keel-ink)]"
+            >
+              Submit report
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Composer */}

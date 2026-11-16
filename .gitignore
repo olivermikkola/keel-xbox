@@ -30,8 +30,33 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
+
+# certificates, keys, and local model/package binaries
+*.pem
+*.key
+*.pfx
+*.snk
+*.cer
+*.p12
+*.gguf
+*.onnx
+*.safetensors
+*.msix
+*.appx
+*.appxbundle
+
+# Visual Studio / UWP build outputs
+.vs/
+*.user
+*.suo
+native/xbox/**/bin/
+native/xbox/**/obj/
+native/xbox/**/AppPackages/
+native/xbox/**/BundleArtifacts/
+native/xbox/KeelConsole.Xbox/ui/
 
 # vercel
 .vercel

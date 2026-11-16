@@ -21,6 +21,8 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
     <RuntimeIdentifiers>win10-x64;win10-x64-aot</RuntimeIdentifiers>
+    <KeelEnableOrtGenAI Condition=" '$(KeelEnableOrtGenAI)' == '' ">true</KeelEnableOrtGenAI>
+    <KeelOrtGenAIVersion Condition=" '$(KeelOrtGenAIVersion)' == '' ">0.5.2</KeelOrtGenAIVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
@@ -40,6 +42,9 @@
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>false</Prefer32Bit>
     <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(KeelEnableOrtGenAI)' == 'true'">
+    <DefineConstants>$(DefineConstants);KEEL_ORT_GENAI</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="App.xaml.cs">
@@ -63,6 +68,7 @@
     <Content Include="Assets\Square44x44Logo.png" />
     <Content Include="Assets\StoreLogo.png" />
     <Content Include="Assets\Wide310x150Logo.png" />
+    <Content Include="ui\**\*" Condition="Exists('ui\index.html')" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
@@ -78,6 +84,7 @@
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform" Version="6.2.14" />
     <PackageReference Include="Microsoft.UI.Xaml" Version="2.8.6" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.DirectML" Version="$(KeelOrtGenAIVersion)" Condition="'$(KeelEnableOrtGenAI)' == 'true'" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
 </Project>

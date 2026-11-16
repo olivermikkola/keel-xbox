@@ -3,13 +3,14 @@
 import { useRef } from "react";
 import { XboxGlyph } from "@/components/keel/xbox-glyph";
 import { useGamepadNavigation } from "@/hooks/use-gamepad-focus";
-import type {
-  KeelAccent,
-  KeelSettings,
-  KeelTone,
-  OutputReport,
-  SafeZoneMode,
-  TextScaleMode,
+import {
+  exportPolicy1116ReportsJson,
+  type KeelAccent,
+  type KeelSettings,
+  type KeelTone,
+  type OutputReport,
+  type SafeZoneMode,
+  type TextScaleMode,
 } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
@@ -209,25 +210,48 @@ export function SettingsView({
           </div>
 
           <div className="keel-card p-5">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-mono text-xs tracking-[0.2em] text-[color:var(--keel-rust)] uppercase">
                 Store Policy 11.16 · AI Output Log
               </h3>
-              {reports.length > 0 && (
-                <button
-                  type="button"
-                  data-keel-focus
-                  onClick={onClearReports}
-                  className="font-mono text-xs text-[color:var(--keel-muted)] hover:text-[color:var(--keel-foam)]"
-                >
-                  Clear ({reports.length})
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {reports.length > 0 && (
+                  <button
+                    type="button"
+                    data-keel-focus
+                    onClick={() => {
+                      const json = exportPolicy1116ReportsJson(reports);
+                      const blob = new Blob([json], {
+                        type: "application/json",
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `keel-policy-11-16-reports-${Date.now()}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="font-mono text-xs text-[color:var(--keel-accent)] hover:underline"
+                  >
+                    Export JSON
+                  </button>
+                )}
+                {reports.length > 0 && (
+                  <button
+                    type="button"
+                    data-keel-focus
+                    onClick={onClearReports}
+                    className="font-mono text-xs text-[color:var(--keel-muted)] hover:text-[color:var(--keel-foam)]"
+                  >
+                    Clear ({reports.length})
+                  </button>
+                )}
+              </div>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-[color:var(--keel-muted)]">
               Keel discloses AI-generated responses and provides an in-app output
-              flagging path per Microsoft Store Policy 11.16. Flagged snippets stay
-              local to this device.
+              reporting path per Microsoft Store Policy 11.16. Flagged snippets stay
+              local to this device and exports omit server URLs and pairing PINs.
             </p>
             {reports.length > 0 ? (
               <ul className="mt-3 flex flex-col gap-2">
@@ -237,8 +261,14 @@ export function SettingsView({
                     className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs"
                   >
                     <div className="font-mono text-[10px] text-[color:var(--keel-rust)]">
-                      {r.modelName} · {new Date(r.createdAt).toLocaleString()}
+                      {r.reason} · {r.modelName} ·{" "}
+                      {new Date(r.createdAt).toLocaleString()}
                     </div>
+                    {r.note && (
+                      <div className="mt-0.5 text-[11px] text-[color:var(--keel-accent)]">
+                        Note: {r.note}
+                      </div>
+                    )}
                     <div className="mt-1 truncate text-[color:var(--keel-foam)]">
                       {r.excerpt}
                     </div>

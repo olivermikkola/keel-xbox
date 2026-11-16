@@ -15,6 +15,7 @@ export type KeelSettings = {
   presetId: string;
   serverUrl: string;
   serverModel: string;
+  serverPin: string;
   temperature: number;
   maxTokens: number;
   contextSize: number;
@@ -38,12 +39,30 @@ export type ChatThread = {
   updatedAt: number;
 };
 
+export type ReportCategory =
+  | "inaccurate"
+  | "harmful"
+  | "privacy"
+  | "garbled"
+  | "other";
+
+export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
+  inaccurate: "Inaccurate / hallucinated",
+  harmful: "Harmful or unsafe",
+  privacy: "Privacy / personal info",
+  garbled: "Broken / garbled text",
+  other: "Other issue",
+};
+
 export type OutputReport = {
   id: string;
   threadId: string;
   messageId: string;
   modelName: string;
+  runtimeMode?: RuntimeMode;
+  category: ReportCategory;
   reason: string;
+  note?: string;
   excerpt: string;
   createdAt: number;
 };
@@ -62,6 +81,7 @@ export const DEFAULT_SETTINGS: KeelSettings = {
   presetId: "general",
   serverUrl: "http://127.0.0.1:11434",
   serverModel: "",
+  serverPin: "",
   temperature: 0.6,
   maxTokens: 384,
   contextSize: 2048,
@@ -123,8 +143,20 @@ export function loadReports(): OutputReport[] {
   try {
     const raw = window.localStorage.getItem(REPORTS_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as OutputReport[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(raw) as Array<Partial<OutputReport>>;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((r) => ({
+      id: r.id ?? `rep-${Date.now()}`,
+      threadId: r.threadId ?? "",
+      messageId: r.messageId ?? "",
+      modelName: r.modelName ?? "Unknown model",
+      runtimeMode: r.runtimeMode,
+      category: r.category ?? "other",
+      reason: r.reason ?? REPORT_CATEGORY_LABELS[r.category ?? "other"],
+      note: r.note,
+      excerpt: r.excerpt ?? "",
+      createdAt: r.createdAt ?? 0,
+    }));
   } catch {
     return [];
   }
@@ -140,6 +172,29 @@ export function saveReport(report: OutputReport): OutputReport[] {
     }
   }
   return next;
+}
+
+export function exportPolicy1116ReportsJson(reports: OutputReport[]): string {
+  return JSON.stringify(
+    {
+      policy: "Microsoft Store Policy 11.16 — Generative AI Output Reports",
+      app: "Keel Console",
+      exportedAt: new Date().toISOString(),
+      count: reports.length,
+      reports: reports.map((r) => ({
+        id: r.id,
+        category: r.category,
+        reason: r.reason,
+        note: r.note ?? null,
+        modelName: r.modelName,
+        runtimeMode: r.runtimeMode ?? null,
+        excerpt: r.excerpt.slice(0, 240),
+        createdAt: new Date(r.createdAt).toISOString(),
+      })),
+    },
+    null,
+    2,
+  );
 }
 
 export const SSR_INITIAL_THREAD: ChatThread = {

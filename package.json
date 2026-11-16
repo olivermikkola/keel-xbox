@@ -8,6 +8,9 @@
     "start": "next start --hostname 127.0.0.1 --port 3847",
     "lint": "eslint",
     "test": "node --experimental-strip-types --test src/lib/__tests__/*.test.ts",
+    "check:store": "node scripts/check-store-readiness.mjs",
+    "hygiene": "node scripts/check-public-hygiene.mjs",
+    "check": "npm run hygiene && npm test && npm run lint && npm run check:store && npm run build",
     "postinstall": "node scripts/sync-wllama-wasm.mjs"
   },
   "dependencies": {

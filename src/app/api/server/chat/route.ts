@@ -3,6 +3,7 @@ import { validateLocalServerUrl } from "@/lib/server-url";
 
 type ChatPayload = {
   baseUrl?: string;
+  pairingCode?: string;
   model?: string;
   messages?: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   temperature?: number;
@@ -38,8 +39,16 @@ export async function POST(req: NextRequest) {
   const model = payload.model?.trim() || "default";
   const temperature = payload.temperature ?? 0.6;
   const maxTokens = payload.maxTokens ?? 384;
+  const pairingCode = payload.pairingCode?.trim();
+  const upstreamHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (pairingCode) {
+    upstreamHeaders["X-Keel-Pairing-Code"] = pairingCode;
+    upstreamHeaders["Authorization"] = `Bearer ${pairingCode}`;
+  }
 
-  // Prefer OpenAI-compatible /v1/chat/completions (works with llama-server, Ollama >=0.1.24, LM Studio)
+  // Prefer OpenAI-compatible /v1/chat/completions (works with Keel Desktop, llama-server, Ollama >=0.1.24, LM Studio)
   let upstream: Response | null = null;
   let mode: "openai" | "ollama" = "openai";
 
@@ -48,7 +57,7 @@ export async function POST(req: NextRequest) {
       method: "POST",
       redirect: "manual",
       signal: req.signal,
-      headers: { "Content-Type": "application/json" },
+      headers: upstreamHeaders,
       body: JSON.stringify({
         model,
         messages,
@@ -57,6 +66,25 @@ export async function POST(req: NextRequest) {
         stream: true,
       }),
     });
+    if (res.status === 401) {
+      return new Response(
+        JSON.stringify({
+          error: "Keel Desktop pairing PIN required or invalid.",
+        }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (res.status === 503) {
+      const errJson = (await res.json().catch(() => ({}))) as { error?: string };
+      return new Response(
+        JSON.stringify({
+          error:
+            errJson.error ??
+            "Keel Desktop has no active model running. Start a model in Keel Desktop first.",
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
+    }
     if (res.ok && res.body) {
       upstream = res;
       mode = "openai";

@@ -26,6 +26,7 @@ export type StreamReplyParams = {
   maxTokens: number;
   serverUrl: string;
   serverModel: string;
+  serverPin?: string;
   onToken: (token: string, stats: InferenceStats) => void;
   onDone: (stats: InferenceStats) => void;
   signal?: AbortSignal;
@@ -75,6 +76,7 @@ export async function streamReply(params: StreamReplyParams): Promise<void> {
     await streamLocalServerChat(
       {
         baseUrl: params.serverUrl,
+        pairingCode: params.serverPin,
         model: params.serverModel,
         messages: params.messages,
         temperature: params.temperature,
