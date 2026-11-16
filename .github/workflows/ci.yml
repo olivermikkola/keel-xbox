@@ -29,9 +29,9 @@ jobs:
         shell: pwsh
         run: |
           $uapRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\Platforms\UAP"
-          $versions = Get-ChildItem -Path $uapRoot -Directory -ErrorAction SilentlyContinue |
+          $versions = @(Get-ChildItem -Path $uapRoot -Directory -ErrorAction SilentlyContinue |
             Sort-Object Name -Descending |
-            Select-Object -ExpandProperty Name
+            Select-Object -ExpandProperty Name)
           Write-Host "Installed UAP SDKs:" ($versions -join ", ")
           if (-not $versions) {
             throw "No UAP SDK installed under $uapRoot"
