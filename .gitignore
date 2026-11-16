@@ -57,6 +57,8 @@ native/xbox/**/obj/
 native/xbox/**/AppPackages/
 native/xbox/**/BundleArtifacts/
 native/xbox/KeelConsole.Xbox/ui/
+native/xbox/KeelConsole.Xbox/KeelLlama.dll
+native/xbox/KeelLlama/build*/
 
 # vercel
 .vercel

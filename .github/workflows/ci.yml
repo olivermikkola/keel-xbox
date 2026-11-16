@@ -19,11 +19,16 @@ jobs:
       - run: npm run check
 
   uwp-xbox:
-    name: UWP Xbox shell (MSBuild x64)
+    name: UWP Xbox shell + xllama (MSBuild x64)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
       - uses: microsoft/setup-msbuild@v2
+
       - name: Detect installed Windows 10/11 UAP SDK
         id: sdk
         shell: pwsh
@@ -39,13 +44,71 @@ jobs:
           $chosen = if ($versions -contains "10.0.22621.0") { "10.0.22621.0" } else { $versions[0] }
           Write-Host "Using TargetPlatformVersion=$chosen"
           "version=$chosen" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-      - name: Restore NuGet & build UWP x64
-        run: >
-          msbuild native/xbox/KeelConsole.Xbox.sln
-          /t:Restore,Build
-          /p:Configuration=Debug
-          /p:Platform=x64
-          /p:TargetPlatformVersion=${{ steps.sdk.outputs.version }}
-          /p:AppxBundle=Never
-          /p:AppxPackageSigningEnabled=false
-          /m
+
+      - name: Export static UI bundle for UWP WebView2
+        run: |
+          npm ci
+          node scripts/export-uwp-ui.mjs
+
+      - name: Build native xllama (llama.cpp UWP x64 DLL)
+        shell: pwsh
+        run: |
+          cmake -S native/xbox/KeelLlama -B native/xbox/KeelLlama/build `
+            -G "Visual Studio 18 2026" -A x64 `
+            -DCMAKE_SYSTEM_NAME=WindowsStore `
+            -DCMAKE_SYSTEM_VERSION=10.0
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Retrying CMake with Visual Studio 17 2022 generator..."
+            Remove-Item -Recurse -Force native/xbox/KeelLlama/build -ErrorAction SilentlyContinue
+            cmake -S native/xbox/KeelLlama -B native/xbox/KeelLlama/build `
+              -G "Visual Studio 17 2022" -A x64 `
+              -DCMAKE_SYSTEM_NAME=WindowsStore `
+              -DCMAKE_SYSTEM_VERSION=10.0
+          }
+          cmake --build native/xbox/KeelLlama/build --config Release --parallel
+          Copy-Item "native/xbox/KeelLlama/build/Release/KeelLlama.dll" "native/xbox/KeelConsole.Xbox/KeelLlama.dll" -Force
+
+      - name: Restore NuGet & package signed sideload MSIX (Release|x64)
+        shell: pwsh
+        run: |
+          $certPassPlain = [guid]::NewGuid().ToString("N")
+          $certPass = ConvertTo-SecureString -String $certPassPlain -Force -AsPlainText
+          $cert = New-SelfSignedCertificate -Type Custom `
+            -Subject "CN=Keel" `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -KeyExportPolicy Exportable `
+            -KeyUsage DigitalSignature `
+            -Type CodeSigningCert `
+            -CertStoreLocation "Cert:\CurrentUser\My"
+
+          $pfxPath = Join-Path $env:RUNNER_TEMP "keel-dev-ci.pfx"
+          $outDir = (Join-Path $PWD "native\xbox\AppPackages")
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $cert | Export-PfxCertificate -FilePath $pfxPath -Password $certPass | Out-Null
+          Export-Certificate -Cert $cert -FilePath (Join-Path $outDir "KeelDev.cer") | Out-Null
+
+          try {
+            msbuild native/xbox/KeelConsole.Xbox.sln `
+              /t:Restore,Build `
+              /p:Configuration=Release `
+              /p:Platform=x64 `
+              /p:TargetPlatformVersion=${{ steps.sdk.outputs.version }} `
+              /p:AppxBundle=Always `
+              /p:AppxBundlePlatforms="x64" `
+              /p:UapAppxPackageBuildMode=SideloadOnly `
+              /p:AppxPackageSigningEnabled=true `
+              /p:PackageCertificateKeyFile="$pfxPath" `
+              /p:PackageCertificatePassword="$certPassPlain" `
+              /p:AppxPackageDir="$outDir\" `
+              /m
+          } finally {
+            Remove-Item -Force $pfxPath -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload Xbox Dev Mode sideload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: keel-console-xbox-x64
+          path: native/xbox/AppPackages/
+          if-no-files-found: error

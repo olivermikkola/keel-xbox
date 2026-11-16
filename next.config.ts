@@ -1,8 +1,17 @@
 import type { NextConfig } from "next";
 
+const isStaticExport = process.env.KEEL_STATIC_EXPORT === "1";
+
 const nextConfig: NextConfig = {
-  cacheComponents: true,
-  partialPrefetching: true,
+  ...(isStaticExport
+    ? {
+        output: "export",
+        images: { unoptimized: true },
+      }
+    : {
+        cacheComponents: true,
+        partialPrefetching: true,
+      }),
   turbopack: {
     root: __dirname,
     rules: {
@@ -12,23 +21,27 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Cross-Origin-Opener-Policy",
-            value: "same-origin",
-          },
-          {
-            key: "Cross-Origin-Embedder-Policy",
-            value: "credentialless",
-          },
-        ],
-      },
-    ];
-  },
+  ...(isStaticExport
+    ? {}
+    : {
+        async headers() {
+          return [
+            {
+              source: "/(.*)",
+              headers: [
+                {
+                  key: "Cross-Origin-Opener-Policy",
+                  value: "same-origin",
+                },
+                {
+                  key: "Cross-Origin-Embedder-Policy",
+                  value: "credentialless",
+                },
+              ],
+            },
+          ];
+        },
+      }),
 };
 
 export default nextConfig;

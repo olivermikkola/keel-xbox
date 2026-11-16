@@ -36,10 +36,14 @@ namespace KeelConsole.Xbox.Services
         private Tokenizer _tokenizer;
 
         public bool IsEngineAttached => true;
-        public string EngineName => "ONNX Runtime GenAI (DirectML)";
+        public string EngineName => KeelLlamaInterop.IsNativeLibraryAvailable()
+            ? "xllama (llama.cpp UWP) + ONNX Runtime GenAI (DirectML)"
+            : "ONNX Runtime GenAI (DirectML)";
 #else
-        public bool IsEngineAttached => false;
-        public string EngineName => "UWP Shell Only (build with KeelEnableOrtGenAI=true)";
+        public bool IsEngineAttached => KeelLlamaInterop.IsNativeLibraryAvailable();
+        public string EngineName => KeelLlamaInterop.IsNativeLibraryAvailable()
+            ? "xllama (llama.cpp UWP)"
+            : "UWP Shell Only (build with KeelEnableOrtGenAI=true)";
 #endif
 
         public IReadOnlyList<LocalModelEntry> EnumerateLocalStateModels()
@@ -125,7 +129,6 @@ namespace KeelConsole.Xbox.Services
         {
             ct.ThrowIfCancellationRequested();
 
-#if KEEL_ORT_GENAI
             return Task.Run(() =>
             {
                 JsonObject req = JsonObject.Parse(requestJson);
@@ -139,10 +142,31 @@ namespace KeelConsole.Xbox.Services
                 if (maxNewTokens < 16) maxNewTokens = 16;
                 if (maxNewTokens > 2048) maxNewTokens = 2048;
 
-                string modelDir = ResolveOrtModelDirectory(modelRef);
-                string prompt = FormatChatPrompt(req.ContainsKey("messages")
+                JsonArray messagesJson = req.ContainsKey("messages")
                     ? req.GetNamedArray("messages")
-                    : new JsonArray());
+                    : new JsonArray();
+
+                // Prefer native xllama (llama.cpp UWP) when a .gguf model exists under LocalState\models
+                string ggufPath = ResolveGgufPathOrNull(modelRef);
+                if (ggufPath != null && KeelLlamaInterop.IsNativeLibraryAvailable())
+                {
+                    var msgList = ParseMessageList(messagesJson);
+                    lock (_modelLock)
+                    {
+                        KeelLlamaInterop.LoadModel(ggufPath, nCtx: 2048, nThreads: 6);
+                        KeelLlamaInterop.StreamChat(
+                            msgList,
+                            (float)temperature,
+                            maxNewTokens,
+                            onToken,
+                            ct);
+                    }
+                    return;
+                }
+
+#if KEEL_ORT_GENAI
+                string modelDir = ResolveOrtModelDirectory(modelRef);
+                string prompt = FormatChatPrompt(messagesJson);
 
                 lock (_modelLock)
                 {
@@ -177,11 +201,51 @@ namespace KeelConsole.Xbox.Services
                         }
                     }
                 }
-            }, ct);
 #else
-            throw new InvalidOperationException(
-                "Microsoft.ML.OnnxRuntimeGenAI.DirectML is not linked in this build (KeelEnableOrtGenAI=false). Build with KeelEnableOrtGenAI=true in Visual Studio on Windows, or use On-Device WASM / Local Server mode.");
+                throw new InvalidOperationException(
+                    "No native GGUF matched or KeelLlama.dll / ONNX Runtime GenAI not linked in this build.");
 #endif
+            }, ct);
+        }
+
+        private static string ResolveGgufPathOrNull(string modelRef)
+        {
+            string modelsDir = Path.Combine(ApplicationData.Current.LocalFolder.Path, "models");
+            if (!Directory.Exists(modelsDir)) return null;
+
+            if (!string.IsNullOrEmpty(modelRef))
+            {
+                string safeName = Path.GetFileName(modelRef.TrimEnd('/', '\\'));
+                if (safeName.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase))
+                {
+                    string exact = Path.Combine(modelsDir, safeName);
+                    if (File.Exists(exact)) return exact;
+                }
+            }
+
+            foreach (string path in Directory.EnumerateFiles(modelsDir, "*.gguf"))
+            {
+                var fi = new FileInfo(path);
+                if (fi.Length > 0 && (ulong)fi.Length <= SingleFileCeilingBytes)
+                {
+                    return path;
+                }
+            }
+
+            return null;
+        }
+
+        private static IReadOnlyList<(string Role, string Content)> ParseMessageList(JsonArray messages)
+        {
+            var list = new List<(string Role, string Content)>((int)messages.Count);
+            for (uint i = 0; i < messages.Count; i++)
+            {
+                var obj = messages.GetObjectAt(i);
+                list.Add((
+                    obj.GetNamedString("role", "user"),
+                    obj.GetNamedString("content", string.Empty)));
+            }
+            return list;
         }
 
 #if KEEL_ORT_GENAI
@@ -269,6 +333,7 @@ namespace KeelConsole.Xbox.Services
         {
             lock (_modelLock)
             {
+                KeelLlamaInterop.Unload();
 #if KEEL_ORT_GENAI
                 _tokenizer?.Dispose();
                 _tokenizer = null;
