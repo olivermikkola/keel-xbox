@@ -28,6 +28,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
   GIT_TAG b12441
   GIT_SHALLOW TRUE
+  PATCH_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/patch_uwp.cmake
 )
 FetchContent_MakeAvailable(llama_cpp)
 
