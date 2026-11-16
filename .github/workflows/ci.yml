@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web:
+    name: Next.js app (test, lint, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+
+  uwp-xbox:
+    name: UWP Xbox shell (MSBuild x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Restore NuGet & build UWP x64
+        run: >
+          msbuild native/xbox/KeelConsole.Xbox.sln
+          /t:Restore,Build
+          /p:Configuration=Debug
+          /p:Platform=x64
+          /p:AppxBundle=Never
+          /p:AppxPackageSigningEnabled=false
+          /m

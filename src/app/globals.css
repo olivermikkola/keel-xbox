@@ -10,19 +10,6 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-display);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -43,51 +30,84 @@
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Canonical Keel visual identity: Ink, Jade, Rust, Paper */
 :root {
-  --keel-ink: #06100e;
-  --keel-foam: #e8f2ee;
-  --keel-water: #3dcfb6;
-  --keel-muted: #8aa39a;
-  --keel-sand: #d2c3a4;
-  --keel-deep: #0c1c18;
+  --keel-ink: #0a1112;
+  --keel-surface: #101a1c;
+  --keel-surface-raised: #162326;
+  --keel-paper: #f7f3e9;
+  --keel-foam: #eef3f2;
+  --keel-muted: #849694;
+  --keel-jade: #709c8f;
+  --keel-jade-bright: #acd0c0;
+  --keel-rust: #c77851;
+  --keel-rust-deep: #b66e4f;
+  --keel-accent: #a4cfc0;
+  --keel-accent-strong: #4d7c70;
+  --keel-accent-ink: #081210;
+  --keel-border: rgb(255 255 255 / 9%);
+  --keel-border-strong: rgb(255 255 255 / 16%);
 
-  --background: #06100e;
-  --foreground: #e8f2ee;
-  --card: #0c1c18;
-  --card-foreground: #e8f2ee;
-  --popover: #0c1c18;
-  --popover-foreground: #e8f2ee;
-  --primary: #3dcfb6;
-  --primary-foreground: #06100e;
-  --secondary: #12241f;
-  --secondary-foreground: #e8f2ee;
-  --muted: #12241f;
-  --muted-foreground: #8aa39a;
-  --accent: #163029;
-  --accent-foreground: #e8f2ee;
-  --destructive: oklch(0.65 0.2 25);
-  --border: rgb(255 255 255 / 12%);
-  --input: rgb(255 255 255 / 14%);
-  --ring: #3dcfb6;
-  --chart-1: #3dcfb6;
-  --chart-2: #8aa39a;
-  --chart-3: #d2c3a4;
-  --chart-4: #e8f2ee;
-  --chart-5: #12241f;
-  --radius: 0.25rem;
-  --sidebar: #0c1c18;
-  --sidebar-foreground: #e8f2ee;
-  --sidebar-primary: #3dcfb6;
-  --sidebar-primary-foreground: #06100e;
-  --sidebar-accent: #163029;
-  --sidebar-accent-foreground: #e8f2ee;
-  --sidebar-border: rgb(255 255 255 / 10%);
-  --sidebar-ring: #3dcfb6;
+  --safe-x: clamp(1.25rem, 3vw, 3rem);
+  --safe-y: 0.75rem;
+  --keel-text-scale: 1;
+
+  --background: var(--keel-ink);
+  --foreground: var(--keel-foam);
+  --card: var(--keel-surface);
+  --card-foreground: var(--keel-foam);
+  --popover: var(--keel-surface);
+  --popover-foreground: var(--keel-foam);
+  --primary: var(--keel-paper);
+  --primary-foreground: var(--keel-ink);
+  --secondary: var(--keel-surface-raised);
+  --secondary-foreground: var(--keel-foam);
+  --muted: var(--keel-surface-raised);
+  --muted-foreground: var(--keel-muted);
+  --accent: var(--keel-accent);
+  --accent-foreground: var(--keel-accent-ink);
+  --destructive: #e06c64;
+  --border: var(--keel-border);
+  --input: rgb(255 255 255 / 13%);
+  --ring: var(--keel-accent);
+  --radius: 0.875rem;
+}
+
+/* Tone variant: Slate (matches Keel Desktop) vs deeper Ink */
+html[data-tone="slate"] {
+  --keel-ink: #0c1415;
+  --keel-surface: #141f21;
+  --keel-surface-raised: #1a272a;
+}
+
+/* Accent variants: Sage | Copper | Ice */
+html[data-accent="copper"] {
+  --keel-accent: #dfa07c;
+  --keel-accent-strong: #9c6244;
+  --keel-accent-ink: #160c07;
+}
+
+html[data-accent="ice"] {
+  --keel-accent: #a8cde8;
+  --keel-accent-strong: #4f7b9e;
+  --keel-accent-ink: #07121b;
+}
+
+/* Xbox TV Overscan 5% Safe Zone */
+html[data-safe-zone="overscan"] {
+  --safe-x: clamp(2.5rem, 5vw, 4.75rem);
+  --safe-y: clamp(1.25rem, 3vh, 2.5rem);
+}
+
+/* Type Scale: 10-ft Large vs Compact */
+html[data-text-scale="large"] {
+  --keel-text-scale: 1.05;
+}
+
+html[data-text-scale="compact"] {
+  --keel-text-scale: 0.94;
 }
 
 @layer base {
@@ -95,72 +115,66 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--keel-ink);
+    color: var(--keel-foam);
+    font-size: calc(1rem * var(--keel-text-scale));
+    overflow-x: hidden;
   }
   html {
     @apply font-sans;
   }
 }
 
-.keel-hull {
-  background:
-    radial-gradient(120% 80% at 70% 10%, rgb(61 207 182 / 18%), transparent 55%),
-    radial-gradient(90% 70% at 10% 90%, rgb(210 195 164 / 10%), transparent 50%),
-    linear-gradient(165deg, #0a1714 0%, #06100e 42%, #040b09 100%);
+.keel-safe-x {
+  padding-left: var(--safe-x);
+  padding-right: var(--safe-x);
 }
 
-.keel-hull::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgb(0 0 0 / 8%) 50%,
-    transparent 100%
-  );
-  background-size: 100% 4px;
-  opacity: 0.35;
-  pointer-events: none;
+.keel-safe-frame {
+  padding-top: var(--safe-y);
+  padding-bottom: var(--safe-y);
 }
 
-.keel-waterline {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgb(61 207 182 / 80%),
-    transparent
-  );
-  box-shadow: 0 0 40px rgb(61 207 182 / 35%);
-  animation: keel-pulse 5.5s ease-in-out infinite;
+/* Calm UWP / Xbox 10-foot Spatial Focus Reveal */
+[data-keel-focus] {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.keel-panel {
-  background:
-    linear-gradient(180deg, rgb(12 28 24 / 90%), rgb(6 16 14 / 95%));
+[data-keel-focus][data-keel-active="true"],
+[data-keel-focus]:focus-visible {
+  outline: none;
+  border-color: var(--keel-accent);
+  box-shadow:
+    0 0 0 2px var(--keel-accent),
+    0 10px 28px -10px rgb(0 0 0 / 70%);
+}
+
+/* Quiet Keel surfaces */
+.keel-card {
+  background: var(--keel-surface);
+  border: 1px solid var(--keel-border);
+  border-radius: 14px;
+}
+
+.keel-card-raised {
+  background: var(--keel-surface-raised);
+  border: 1px solid var(--keel-border-strong);
+  border-radius: 14px;
 }
 
 .keel-rail {
-  border-top: 1px solid rgb(255 255 255 / 8%);
-  background: rgb(4 11 9 / 92%);
-  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--keel-border);
+  background: rgb(10 17 18 / 90%);
+  backdrop-filter: blur(12px);
 }
 
 .keel-caret {
-  background: var(--keel-water);
+  background: var(--keel-accent);
   animation: keel-blink 1s steps(1) infinite;
-}
-
-@keyframes keel-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scaleX(0.92);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
 }
 
 @keyframes keel-blink {
@@ -175,8 +189,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .keel-waterline,
   .keel-caret {
     animation: none;
+  }
+  [data-keel-focus] {
+    transition: none;
   }
 }

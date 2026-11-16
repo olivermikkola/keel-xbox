@@ -1,0 +1,13 @@
+<Page
+    x:Class="KeelConsole.Xbox.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    Background="#0A1112">
+
+    <Grid>
+        <controls:WebView2
+            x:Name="ConsoleWebView"
+            DefaultBackgroundColor="#0A1112" />
+    </Grid>
+</Page>

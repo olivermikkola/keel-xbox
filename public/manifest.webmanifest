@@ -1,0 +1,27 @@
+{
+  "name": "Keel Console",
+  "short_name": "Keel",
+  "description": "Local language models on Xbox — a 10-foot living-room AI console app.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c1415",
+  "theme_color": "#0c1415",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

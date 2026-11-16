@@ -1,64 +1,129 @@
 "use client";
 
+import { useRef } from "react";
 import { motion } from "motion/react";
+import { XboxGlyph } from "@/components/keel/xbox-glyph";
+import { useGamepadNavigation } from "@/hooks/use-gamepad-focus";
 
 type Props = {
+  active: boolean;
   onBack: () => void;
+  onOpenModels: () => void;
+  onPrevTab: () => void;
+  onNextTab: () => void;
 };
 
 const STEPS = [
   {
-    title: "UX slice (now)",
-    body: "This web console proves the 10-foot experience: catalogue, focus, and Xbox-class tok/s timing without needing a Dev Mode kit yet.",
+    code: "01 · LIVE NOW",
+    title: "10-Foot App + Real Inference",
+    body: "Keel Console runs real GGUF models in browser WASM (@wllama/wllama), connects to Ollama or llama-server on your LAN, and persists threads with full Xbox controller D-pad/stick navigation.",
   },
   {
-    title: "UWP Dev Mode",
-    body: "Port the shell to a UWP Xbox app with ONNX Runtime GenAI and/or llama.cpp. Sideload via Partner Center Developer Mode — real weights on Series S|X.",
+    code: "02 · NATIVE/XBOX",
+    title: "UWP Dev Mode Shell",
+    body: "native/xbox/KeelConsole.Xbox hosts this exact UI in WebView2 with ApplicationViewScaling disabled for crisp 1080p/4K TV rendering, XY mouse-mode off, and a WinRT keelBridge for LocalState ONNX Runtime GenAI & llama.cpp.",
   },
   {
-    title: "Microsoft Store",
-    body: "Ship as a non-game Xbox app: WACK-clean binaries, generative AI disclosure (Store policy 11.16), Partner Center submission. Retail path is the product goal; Dev Mode is the hardware proving ground.",
+    code: "03 · MICROSOFT STORE",
+    title: "Retail Xbox App Submission",
+    body: "Shipped as a non-game Windows.Xbox app (no ID@Xbox networking needed): WACK-clean binaries, Store Policy 11.16 generative AI disclosure + output flagging, and sub-2 GB LocalState model budgets.",
   },
 ];
 
-export function PathView({ onBack }: Props) {
+export function PathView({
+  active,
+  onBack,
+  onOpenModels,
+  onPrevTab,
+  onNextTab,
+}: Props) {
+  const containerRef = useRef<HTMLElement>(null);
+
+  useGamepadNavigation({
+    containerRef,
+    enabled: active,
+    onBack,
+    onActionY: onOpenModels,
+    onPrevTab,
+    onNextTab,
+  });
+
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-6 py-8 sm:px-10 lg:px-14">
-      <div className="mb-8 flex items-end justify-between gap-4">
+    <section
+      ref={containerRef}
+      className="keel-safe-x flex min-h-0 flex-1 flex-col py-6"
+    >
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.3em] text-[color:var(--keel-water)] uppercase">
-            Ship path
+          <p className="font-mono text-[11px] tracking-[0.28em] text-[color:var(--keel-rust)] uppercase">
+            UWP &amp; Store Path
           </p>
-          <h2 className="mt-2 font-[family-name:var(--font-display)] text-4xl tracking-tight text-[color:var(--keel-foam)]">
-            Xbox app, Store-bound
+          <h2 className="mt-1 font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[color:var(--keel-paper)] sm:text-4xl">
+            From web console to retail Xbox app
           </h2>
         </div>
+
         <button
           type="button"
+          data-keel-focus
+          data-keel-default-focus="true"
           onClick={onBack}
-          className="border border-white/15 px-4 py-2 font-mono text-[11px] tracking-[0.2em] text-[color:var(--keel-muted)] uppercase hover:border-white/40 hover:text-[color:var(--keel-foam)]"
+          className="keel-card flex items-center gap-2 rounded-full px-4 py-2 font-mono text-xs text-[color:var(--keel-muted)] hover:text-[color:var(--keel-foam)]"
         >
-          Back
+          <XboxGlyph button="B" />
+          <span>Home</span>
         </button>
       </div>
 
-      <ol className="flex max-w-3xl flex-col gap-4">
+      <div
+        data-keel-scroll
+        className="grid min-h-0 flex-1 gap-4 overflow-y-auto pb-6 lg:grid-cols-3"
+      >
         {STEPS.map((step, i) => (
-          <motion.li
-            key={step.title}
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="border border-white/10 bg-black/25 px-5 py-5"
+          <motion.div
+            key={step.code}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="keel-card flex flex-col justify-between p-6"
           >
-            <div className="font-mono text-[11px] tracking-[0.25em] text-[color:var(--keel-water)] uppercase">
-              0{i + 1}
+            <div>
+              <div className="font-mono text-[11px] tracking-[0.22em] text-[color:var(--keel-accent)] uppercase">
+                {step.code}
+              </div>
+              <h3 className="mt-3 text-xl font-semibold text-[color:var(--keel-paper)]">
+                {step.title}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-[color:var(--keel-muted)]">
+                {step.body}
+              </p>
             </div>
-            <h3 className="mt-2 text-xl text-[color:var(--keel-foam)]">{step.title}</h3>
-            <p className="mt-2 text-[color:var(--keel-muted)] leading-relaxed">{step.body}</p>
-          </motion.li>
+          </motion.div>
         ))}
-      </ol>
+
+        <div className="keel-card col-span-full flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <div className="font-mono text-xs text-[color:var(--keel-paper)]">
+              native/xbox/KeelConsole.Xbox
+            </div>
+            <p className="mt-1 text-xs text-[color:var(--keel-muted)]">
+              Open <code className="font-mono">KeelConsole.Xbox.sln</code> in
+              Visual Studio on Windows with the UWP / Xbox Dev Mode workload to
+              build and sideload the <code className="font-mono">.msix</code>{" "}
+              package onto Series S|X.
+            </p>
+          </div>
+          <button
+            type="button"
+            data-keel-focus
+            onClick={onOpenModels}
+            className="rounded-full bg-[color:var(--keel-paper)] px-5 py-2.5 text-xs font-semibold text-[color:var(--keel-ink)]"
+          >
+            Browse model catalogue
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
