@@ -89,13 +89,20 @@ export const DEFAULT_SETTINGS: KeelSettings = {
 
 export function loadSettings(): KeelSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  const hasUwpBridge = Boolean(
+    (window as { chrome?: { webview?: { hostObjects?: { keelBridge?: unknown } } } })
+      .chrome?.webview?.hostObjects?.keelBridge,
+  );
+  const fallback: KeelSettings = hasUwpBridge
+    ? { ...DEFAULT_SETTINGS, runtimeMode: "uwp-native" }
+    : DEFAULT_SETTINGS;
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<KeelSettings>;
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    return { ...fallback, ...parsed };
   } catch {
-    return DEFAULT_SETTINGS;
+    return fallback;
   }
 }
 

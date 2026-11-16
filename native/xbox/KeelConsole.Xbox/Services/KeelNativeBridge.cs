@@ -34,8 +34,10 @@ namespace KeelConsole.Xbox.Services
 
         private readonly LocalInferenceService _inference = new LocalInferenceService();
         private readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromMinutes(3) };
+        private readonly HttpClient _downloadHttp = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         private CoreWebView2 _coreWebView;
         private CancellationTokenSource _activeCts;
+        private CancellationTokenSource _downloadCts;
 
         internal void AttachWebView(CoreWebView2 core)
         {
@@ -388,6 +390,152 @@ namespace KeelConsole.Xbox.Services
         public void CancelChat()
         {
             _activeCts?.Cancel();
+        }
+
+        public void CancelDownload()
+        {
+            _downloadCts?.Cancel();
+        }
+
+        public string DeleteLocalModel(string fileName)
+        {
+            string safeName = Path.GetFileName((fileName ?? string.Empty).Trim());
+            if (string.IsNullOrEmpty(safeName))
+            {
+                return "{\"ok\":false,\"error\":\"Invalid file name.\"}";
+            }
+
+            string modelsDir = Path.Combine(ApplicationData.Current.LocalFolder.Path, "models");
+            string target = Path.Combine(modelsDir, safeName);
+            try
+            {
+                if (File.Exists(target))
+                {
+                    KeelLlamaInterop.Unload();
+                    File.Delete(target);
+                }
+                return "{\"ok\":true}";
+            }
+            catch (Exception ex)
+            {
+                return new JsonObject
+                {
+                    ["ok"] = JsonValue.CreateBooleanValue(false),
+                    ["error"] = JsonValue.CreateStringValue(ex.Message),
+                }.Stringify();
+            }
+        }
+
+        public void DownloadLocalModel(string requestJson)
+        {
+            _downloadCts?.Cancel();
+            _downloadCts = new CancellationTokenSource();
+            var ct = _downloadCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                string requestId = "dl";
+                string partPath = null;
+                try
+                {
+                    JsonObject reqObj = JsonObject.Parse(requestJson);
+                    requestId = reqObj.GetNamedString("requestId", "dl");
+                    string url = reqObj.GetNamedString("url", "").Trim();
+                    string rawName = reqObj.GetNamedString("fileName", "").Trim();
+                    string safeName = Path.GetFileName(rawName);
+
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri parsed) ||
+                        (parsed.Scheme != Uri.UriSchemeHttps && parsed.Scheme != Uri.UriSchemeHttp))
+                    {
+                        PostEvent(requestId, "error", error: "Enter a valid http:// or https:// model URL.");
+                        return;
+                    }
+                    if (string.IsNullOrEmpty(safeName) || !safeName.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        safeName = "model.gguf";
+                    }
+
+                    string modelsDir = Path.Combine(ApplicationData.Current.LocalFolder.Path, "models");
+                    Directory.CreateDirectory(modelsDir);
+                    string finalPath = Path.Combine(modelsDir, safeName);
+                    partPath = finalPath + ".part";
+
+                    using (var res = await _downloadHttp.GetAsync(parsed, HttpCompletionOption.ResponseHeadersRead, ct))
+                    {
+                        if (!res.IsSuccessStatusCode)
+                        {
+                            PostEvent(requestId, "error", error: $"Download returned HTTP {(int)res.StatusCode}.");
+                            return;
+                        }
+
+                        long totalBytes = res.Content.Headers.ContentLength ?? -1;
+                        if (totalBytes > (long)LocalInferenceService.SingleFileCeilingBytes)
+                        {
+                            PostEvent(requestId, "error", error: "Model exceeds the 2 GiB Xbox AppContainer single-file limit.");
+                            return;
+                        }
+
+                        using (var src = await res.Content.ReadAsStreamAsync())
+                        using (var dst = new FileStream(partPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
+                        {
+                            byte[] buffer = new byte[65536];
+                            long loaded = 0;
+                            long lastReportAt = 0;
+                            int read;
+                            while ((read = await src.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                            {
+                                loaded += read;
+                                if (loaded > (long)LocalInferenceService.SingleFileCeilingBytes)
+                                {
+                                    throw new InvalidOperationException("Download exceeded the 2 GiB Xbox AppContainer file limit.");
+                                }
+                                await dst.WriteAsync(buffer, 0, read, ct);
+
+                                if (loaded - lastReportAt >= 512 * 1024 || (totalBytes > 0 && loaded >= totalBytes))
+                                {
+                                    lastReportAt = loaded;
+                                    PostProgress(requestId, loaded, totalBytes);
+                                }
+                            }
+                        }
+                    }
+
+                    if (File.Exists(finalPath))
+                    {
+                        File.Delete(finalPath);
+                    }
+                    File.Move(partPath, finalPath);
+                    partPath = null;
+                    PostEvent(requestId, "done");
+                }
+                catch (OperationCanceledException)
+                {
+                    PostEvent(requestId, "error", error: "Download cancelled.");
+                }
+                catch (Exception ex)
+                {
+                    PostEvent(requestId, "error", error: ex.Message);
+                }
+                finally
+                {
+                    if (partPath != null && File.Exists(partPath))
+                    {
+                        try { File.Delete(partPath); } catch { }
+                    }
+                }
+            }, ct);
+        }
+
+        private void PostProgress(string requestId, long loaded, long total)
+        {
+            var obj = new JsonObject
+            {
+                ["requestId"] = JsonValue.CreateStringValue(requestId ?? "dl"),
+                ["type"] = JsonValue.CreateStringValue("progress"),
+                ["loaded"] = JsonValue.CreateNumberValue(loaded),
+                ["total"] = JsonValue.CreateNumberValue(total),
+            };
+            PostToWeb(obj.Stringify());
         }
 
         private void PostEvent(string requestId, string type, string token = null, string error = null)

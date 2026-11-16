@@ -24,6 +24,9 @@ type KeelNativeHostObject = {
     pairingCode: string,
   ) => Promise<string> | string;
   StreamServerChat?: (requestJson: string) => Promise<string> | string;
+  DownloadLocalModel?: (requestJson: string) => Promise<void> | void;
+  CancelDownload?: () => Promise<void> | void;
+  DeleteLocalModel?: (fileName: string) => Promise<string> | string;
 };
 
 declare global {
@@ -246,4 +249,74 @@ export async function streamUwpServerChat(
       reject(err instanceof Error ? err : new Error("UWP LAN bridge call failed"));
     });
   });
+}
+
+export async function downloadUwpLocalModel(
+  url: string,
+  fileName: string,
+  onProgress: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const webview = window.chrome?.webview;
+  const bridge = webview?.hostObjects?.keelBridge;
+  if (!bridge?.DownloadLocalModel) {
+    throw new Error("UWP download bridge is unavailable.");
+  }
+
+  const requestId = `dl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+  await new Promise<void>((resolve, reject) => {
+    const onMessage = (event: { data: unknown }) => {
+      try {
+        const msg =
+          typeof event.data === "string"
+            ? (JSON.parse(event.data) as Record<string, unknown>)
+            : (event.data as Record<string, unknown>);
+        if (!msg || msg.requestId !== requestId) return;
+        if (msg.type === "progress") {
+          onProgress(Number(msg.loaded ?? 0), Number(msg.total ?? -1));
+        } else if (msg.type === "done") {
+          cleanup();
+          resolve();
+        } else if (msg.type === "error") {
+          cleanup();
+          reject(new Error(String(msg.error ?? "UWP download failed")));
+        }
+      } catch (err) {
+        cleanup();
+        reject(err instanceof Error ? err : new Error("Invalid bridge message"));
+      }
+    };
+
+    const onAbort = () => {
+      void bridge.CancelDownload?.();
+      cleanup();
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+
+    const cleanup = () => {
+      webview?.removeEventListener?.("message", onMessage);
+      signal?.removeEventListener("abort", onAbort);
+    };
+
+    webview?.addEventListener?.("message", onMessage);
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    Promise.resolve(
+      bridge.DownloadLocalModel!(JSON.stringify({ requestId, url, fileName })),
+    ).catch((err: unknown) => {
+      cleanup();
+      reject(err instanceof Error ? err : new Error("Download call failed"));
+    });
+  });
+}
+
+export async function deleteUwpLocalModel(fileName: string): Promise<void> {
+  const bridge = window.chrome?.webview?.hostObjects?.keelBridge;
+  if (!bridge?.DeleteLocalModel) return;
+  const raw = await bridge.DeleteLocalModel(fileName);
+  const parsed = JSON.parse(raw) as { ok?: boolean; error?: string };
+  if (!parsed.ok) {
+    throw new Error(parsed.error ?? "Failed to remove model.");
+  }
 }

@@ -21,6 +21,8 @@ import {
   type ServerModelInfo,
 } from "@/lib/server-runtime";
 import {
+  deleteUwpLocalModel,
+  downloadUwpLocalModel,
   getUwpSystemInfo,
   isUwpHostAvailable,
   listUwpLocalModels,
@@ -101,7 +103,16 @@ export function ModelsView({
 
   const [uwpInfo, setUwpInfo] = useState<UwpSystemInfo | null>(null);
   const [uwpModels, setUwpModels] = useState<UwpLocalModelEntry[]>([]);
+  const [uwpDownloadingId, setUwpDownloadingId] = useState<string | null>(null);
+  const [uwpDownloadLoaded, setUwpDownloadLoaded] = useState(0);
+  const [uwpDownloadTotal, setUwpDownloadTotal] = useState(0);
   const uwpAttached = isUwpHostAvailable();
+
+  const refreshUwpModels = useCallback(async () => {
+    if (!uwpAttached) return;
+    const models = await listUwpLocalModels();
+    setUwpModels(models);
+  }, [uwpAttached]);
 
   const refreshCache = useCallback(async () => {
     const list = await wllamaRuntime.listCachedModels();
@@ -234,6 +245,49 @@ export function ModelsView({
         err instanceof Error ? err.message : "Failed to load custom GGUF URL.",
       );
       setBusyMessage(null);
+    }
+  }
+
+  async function handleUwpDownload(model: KeelModel) {
+    if (!model.ggufUrl || !model.ggufFileName) return;
+    setErrorMsg(null);
+    setUwpDownloadingId(model.id);
+    setUwpDownloadLoaded(0);
+    setUwpDownloadTotal(model.exactBytes ?? model.sizeMb * 1024 * 1024);
+    setBusyMessage(`Downloading ${model.name} directly to Xbox LocalState…`);
+    try {
+      await downloadUwpLocalModel(
+        model.ggufUrl,
+        model.ggufFileName,
+        (loaded, total) => {
+          setUwpDownloadLoaded(loaded);
+          if (total > 0) setUwpDownloadTotal(total);
+        },
+      );
+      await refreshUwpModels();
+      onSelectModel(model);
+      onChangeRuntimeMode("uwp-native");
+      setBusyMessage(`${model.name} saved to Xbox LocalState.`);
+      onOpenConsole();
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Xbox download failed.",
+      );
+      setBusyMessage(null);
+    } finally {
+      setUwpDownloadingId(null);
+    }
+  }
+
+  async function handleUwpDelete(fileName: string) {
+    setErrorMsg(null);
+    try {
+      await deleteUwpLocalModel(fileName);
+      await refreshUwpModels();
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Failed to delete model.",
+      );
     }
   }
 
@@ -638,20 +692,149 @@ export function ModelsView({
                 </div>
               )}
               {uwpModels.length > 0 && (
-                <ul className="mt-4 flex flex-col gap-2">
-                  {uwpModels.map((um) => (
-                    <li
-                      key={um.fileName}
-                      className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-2.5 font-mono text-xs"
-                    >
-                      <span>{um.fileName}</span>
-                      <span className="text-[color:var(--keel-muted)]">
-                        {formatBytes(um.sizeBytes)} · {um.backend}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-4">
+                  <div className="mb-2 font-mono text-[11px] tracking-[0.18em] text-[color:var(--keel-accent)] uppercase">
+                    Installed on Xbox (LocalState\models)
+                  </div>
+                  <ul className="flex flex-col gap-2">
+                    {uwpModels.map((um) => {
+                      const matchingCatalogue = KEEL_MODELS.find(
+                        (m) => m.ggufFileName?.toLowerCase() === um.fileName.toLowerCase(),
+                      );
+                      return (
+                        <li
+                          key={um.fileName}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-xs"
+                        >
+                          <div>
+                            <div className="font-mono text-sm text-[color:var(--keel-paper)]">
+                              {um.fileName}
+                            </div>
+                            <div className="mt-0.5 font-mono text-[11px] text-[color:var(--keel-muted)]">
+                              {formatBytes(um.sizeBytes)} · {um.backend}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              data-keel-focus
+                              onClick={() => void handleUwpDelete(um.fileName)}
+                              className="rounded-full border border-white/15 px-3 py-1.5 font-mono text-[11px] text-[color:var(--keel-muted)] hover:border-[#e06c64]/50 hover:text-[#f3a6a0]"
+                            >
+                              Remove
+                            </button>
+                            <button
+                              type="button"
+                              data-keel-focus
+                              onClick={() => {
+                                if (matchingCatalogue) onSelectModel(matchingCatalogue);
+                                onChangeRuntimeMode("uwp-native");
+                                onOpenConsole();
+                              }}
+                              className="rounded-full bg-[color:var(--keel-paper)] px-4 py-1.5 font-semibold text-[color:var(--keel-ink)]"
+                            >
+                              Chat · A
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               )}
+
+              {uwpDownloadingId && (
+                <div className="mt-4 rounded-xl border border-[color:var(--keel-accent)]/40 bg-black/30 p-3">
+                  <div className="flex items-center justify-between font-mono text-xs">
+                    <span className="text-[color:var(--keel-foam)]">
+                      Downloading to Xbox LocalState…
+                    </span>
+                    <span className="text-[color:var(--keel-accent)]">
+                      {uwpDownloadTotal > 0
+                        ? `${Math.round((uwpDownloadLoaded / uwpDownloadTotal) * 100)}% · ${formatBytes(uwpDownloadLoaded)} / ${formatBytes(uwpDownloadTotal)}`
+                        : formatBytes(uwpDownloadLoaded)}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full bg-[color:var(--keel-accent)] transition-all"
+                      style={{
+                        width: `${uwpDownloadTotal > 0 ? Math.max(4, Math.round((uwpDownloadLoaded / uwpDownloadTotal) * 100)) : 8}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* In-app 1-click download to Xbox LocalState for xllama */}
+            <div className="keel-card p-5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold text-[color:var(--keel-paper)]">
+                    Download models directly to Xbox (xllama native GGUF)
+                  </h4>
+                  <p className="mt-0.5 text-xs text-[color:var(--keel-muted)]">
+                    Downloads straight to AppContainer LocalState\models — no PC upload needed.
+                  </p>
+                </div>
+              </div>
+              <ul className="flex flex-col gap-2.5">
+                {KEEL_MODELS.filter((m) => m.ggufUrl && m.ggufFileName).map((model) => {
+                  const installed = uwpModels.some(
+                    (um) => um.fileName.toLowerCase() === model.ggufFileName!.toLowerCase(),
+                  );
+                  const downloading = uwpDownloadingId === model.id;
+                  return (
+                    <li
+                      key={model.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-[color:var(--keel-paper)]">
+                            {model.name}
+                          </span>
+                          <Badge variant="outline" className="font-mono text-[10px]">
+                            {model.sizeLabel}
+                          </Badge>
+                          {installed && (
+                            <Badge className="bg-[color:var(--keel-accent)] text-[color:var(--keel-accent-ink)]">
+                              On Xbox
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-[color:var(--keel-muted)]">
+                          {model.xboxNote}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        data-keel-focus
+                        disabled={!uwpAttached || Boolean(uwpDownloadingId)}
+                        onClick={() => {
+                          if (installed) {
+                            onSelectModel(model);
+                            onChangeRuntimeMode("uwp-native");
+                            onOpenConsole();
+                          } else {
+                            void handleUwpDownload(model);
+                          }
+                        }}
+                        className="rounded-full bg-[color:var(--keel-paper)] px-5 py-2 text-xs font-semibold text-[color:var(--keel-ink)] disabled:opacity-40"
+                      >
+                        {downloading
+                          ? "Downloading…"
+                          : installed
+                            ? "Open in console"
+                            : uwpAttached
+                              ? "Download to Xbox"
+                              : "Requires UWP shell"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           </div>
         ) : (
