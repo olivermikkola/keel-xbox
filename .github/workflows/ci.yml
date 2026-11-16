@@ -55,17 +55,15 @@ jobs:
         run: |
           cmake -S native/xbox/KeelLlama -B native/xbox/KeelLlama/build `
             -G "Visual Studio 18 2026" -A x64 `
-            -DCMAKE_SYSTEM_NAME=WindowsStore `
-            -DCMAKE_SYSTEM_VERSION=10.0
+            "-DCMAKE_SYSTEM_NAME=WindowsStore" `
+            "-DCMAKE_SYSTEM_VERSION=10.0"
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "Retrying CMake with Visual Studio 17 2022 generator..."
-            Remove-Item -Recurse -Force native/xbox/KeelLlama/build -ErrorAction SilentlyContinue
-            cmake -S native/xbox/KeelLlama -B native/xbox/KeelLlama/build `
-              -G "Visual Studio 17 2022" -A x64 `
-              -DCMAKE_SYSTEM_NAME=WindowsStore `
-              -DCMAKE_SYSTEM_VERSION=10.0
+            throw "CMake configure failed with exit code $LASTEXITCODE"
           }
           cmake --build native/xbox/KeelLlama/build --config Release --parallel
+          if ($LASTEXITCODE -ne 0) {
+            throw "CMake build failed with exit code $LASTEXITCODE"
+          }
           Copy-Item "native/xbox/KeelLlama/build/Release/KeelLlama.dll" "native/xbox/KeelConsole.Xbox/KeelLlama.dll" -Force
 
       - name: Restore NuGet & package signed sideload MSIX (Release|x64)
