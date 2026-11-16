@@ -71,7 +71,7 @@ jobs:
         run: |
           $certPassPlain = [guid]::NewGuid().ToString("N")
           $certPass = ConvertTo-SecureString -String $certPassPlain -Force -AsPlainText
-          $cert = New-SelfSignedCertificate -Type Custom `
+          $cert = New-SelfSignedCertificate `
             -Subject "CN=Keel" `
             -KeyAlgorithm RSA `
             -KeyLength 2048 `
