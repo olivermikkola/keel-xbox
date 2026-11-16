@@ -5,9 +5,7 @@
     xmlns:controls="using:Microsoft.UI.Xaml.Controls"
     Background="#0A1112">
 
-    <Grid>
-        <controls:WebView2
-            x:Name="ConsoleWebView"
-            DefaultBackgroundColor="#0A1112" />
+    <Grid Background="#0A1112">
+        <controls:WebView2 x:Name="ConsoleWebView" />
     </Grid>
 </Page>
