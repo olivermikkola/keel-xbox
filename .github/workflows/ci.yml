@@ -24,12 +24,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: microsoft/setup-msbuild@v2
+      - name: Detect installed Windows 10/11 UAP SDK
+        id: sdk
+        shell: pwsh
+        run: |
+          $uapRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\Platforms\UAP"
+          $versions = Get-ChildItem -Path $uapRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            Select-Object -ExpandProperty Name
+          Write-Host "Installed UAP SDKs:" ($versions -join ", ")
+          if (-not $versions) {
+            throw "No UAP SDK installed under $uapRoot"
+          }
+          $chosen = if ($versions -contains "10.0.22621.0") { "10.0.22621.0" } else { $versions[0] }
+          Write-Host "Using TargetPlatformVersion=$chosen"
+          "version=$chosen" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
       - name: Restore NuGet & build UWP x64
         run: >
           msbuild native/xbox/KeelConsole.Xbox.sln
           /t:Restore,Build
           /p:Configuration=Debug
           /p:Platform=x64
+          /p:TargetPlatformVersion=${{ steps.sdk.outputs.version }}
           /p:AppxBundle=Never
           /p:AppxPackageSigningEnabled=false
           /m
