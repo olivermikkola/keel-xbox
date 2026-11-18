@@ -18,12 +18,12 @@ export function KeelMark({ className }: { className?: string }) {
     >
       <defs>
         <linearGradient id={jadeId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#acd0c0" />
-          <stop offset="100%" stopColor="#507e74" />
+          <stop offset="0%" stopColor="#76dfc2" />
+          <stop offset="100%" stopColor="#217a65" />
         </linearGradient>
         <linearGradient id={rustId} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#613c30" />
-          <stop offset="100%" stopColor="#c77851" />
+          <stop offset="0%" stopColor="#8f4224" />
+          <stop offset="100%" stopColor="#f09467" />
         </linearGradient>
       </defs>
       <path
@@ -51,12 +51,12 @@ export function KeelSailBackdrop({ className }: { className?: string }) {
       className={cn("pointer-events-none select-none", className)}
     >
       <path
-        fill="#4f2f21"
+        fill="#5a2b19"
         opacity="0.88"
         d="M72 444C212 364 328 372 512 404V238C446 338 242 336 72 444Z"
       />
       <path
-        fill="#163029"
+        fill="#133a31"
         opacity="0.92"
         d="M72 444L512 48V238C454 328 312 326 202 374C152 396 108 422 72 444Z"
       />

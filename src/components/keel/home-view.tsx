@@ -143,7 +143,7 @@ export function HomeView({
               onClick={onOpenPath}
               className="keel-card flex min-h-13 items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-[color:var(--keel-muted)] hover:text-[color:var(--keel-foam)]"
             >
-              <span>UWP &amp; Store</span>
+              <span>Roadmap</span>
             </button>
           </motion.div>
 

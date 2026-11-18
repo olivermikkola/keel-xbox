@@ -34,9 +34,9 @@ export function StatusRail({
         : model.name;
 
   return (
-    <footer className="keel-rail keel-safe-x relative z-20 flex flex-wrap items-center justify-between gap-3 py-3 text-xs text-[color:var(--keel-muted)]">
+    <footer className="keel-rail keel-safe-x relative z-20 flex flex-wrap items-center justify-between gap-3 py-3 text-sm text-[color:var(--keel-muted)]">
       <div className="flex flex-wrap items-center gap-4">
-        <span className="inline-flex items-center gap-2 font-mono text-[11px]">
+        <span className="inline-flex items-center gap-2 font-mono text-sm">
           <span
             className={cn(
               "inline-block size-2 rounded-full",
@@ -59,7 +59,7 @@ export function StatusRail({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3 font-mono text-[11px]">
+      <div className="flex shrink-0 items-center gap-3 font-mono text-sm">
         <span className="hidden sm:inline text-[color:var(--keel-muted)]">
           {viewLabel}
         </span>

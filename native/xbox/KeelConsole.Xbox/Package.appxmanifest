@@ -38,7 +38,7 @@
         Description="On-device language models for Xbox — a 10-foot living-room console app."
         BackgroundColor="#0A1112">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
-        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#0C1415" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#0A1112" />
       </uap:VisualElements>
     </Application>
   </Applications>
