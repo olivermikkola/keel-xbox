@@ -41,7 +41,7 @@ const VIEW_LABEL: Record<View, string> = {
   console: "Console",
   models: "Models",
   settings: "Settings",
-  path: "UWP",
+  path: "Roadmap",
 };
 
 const EMPTY_SERVER_WLLAMA: BrowserRuntimeState = {
@@ -242,7 +242,7 @@ export function KeelShell() {
             <span className="font-[family-name:var(--font-display)] text-xl font-bold tracking-tight text-[color:var(--keel-paper)]">
               Keel
             </span>
-            <span className="font-mono text-[10px] tracking-[0.26em] text-[color:var(--keel-rust)] uppercase">
+            <span className="font-mono text-xs tracking-[0.26em] text-[color:var(--keel-rust)] uppercase">
               Console
             </span>
           </div>
@@ -256,7 +256,7 @@ export function KeelShell() {
               type="button"
               onClick={() => setView(id)}
               className={cn(
-                "rounded-full px-3.5 py-1.5 font-mono text-[11px] tracking-[0.16em] uppercase transition-colors",
+                "rounded-full px-4 py-2 font-mono text-base tracking-[0.12em] uppercase transition-colors",
                 view === id
                   ? "bg-[color:var(--keel-paper)] font-semibold text-[color:var(--keel-ink)]"
                   : "text-[color:var(--keel-muted)] hover:text-[color:var(--keel-foam)]",

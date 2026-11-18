@@ -57,7 +57,7 @@ export function PathView({
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-[11px] tracking-[0.28em] text-[color:var(--keel-rust)] uppercase">
-            UWP &amp; Store Path
+            Roadmap
           </p>
           <h2 className="mt-1 font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[color:var(--keel-paper)] sm:text-4xl">
             From web console to retail Xbox app
