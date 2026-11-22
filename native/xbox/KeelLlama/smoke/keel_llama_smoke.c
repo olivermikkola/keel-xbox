@@ -3,11 +3,14 @@
  * KeelLlamaInterop.cs (load -> chat_stream with callbacks -> unload) on a real
  * GGUF, and prints tokens/sec. Exit code 0 only if real text came back.
  *
- *   keel_llama_smoke <model.gguf> [prompt]
+ *   keel_llama_smoke <model.gguf> [prompt] [n_threads]
+ *
+ * n_threads defaults to 0, which lets keel_llama pick (same as the Xbox app).
  */
 #include "../keel_llama.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -41,10 +44,11 @@ int main(int argc, char ** argv) {
         return 2;
     }
     const char * prompt = argc > 2 ? argv[2] : "In one sentence, what is an Xbox?";
+    const int32_t n_threads = argc > 3 ? (int32_t) atoi(argv[3]) : 0;
     char err[512] = {0};
 
     double t0 = now_s();
-    if (keel_llama_load(argv[1], 2048, 6, err, (int32_t) sizeof(err)) != 0) {
+    if (keel_llama_load(argv[1], 2048, n_threads, err, (int32_t) sizeof(err)) != 0) {
         fprintf(stderr, "load failed: %s\n", err);
         return 1;
     }
@@ -74,6 +78,12 @@ int main(int argc, char ** argv) {
         t_load, st.pieces, t_gen, t_gen > 0 ? st.pieces / t_gen : 0.0, st.bytes);
     if (st.pieces < 3 || st.bytes < 8) {
         fprintf(stderr, "model produced too little text\n");
+        return 1;
+    }
+    /* A 350M Q4 model does 70+ tok/s on 2 cores; < 5 means threads are
+       oversubscribed (more llama threads than usable cores). */
+    if (t_gen > 0 && st.pieces / t_gen < 5.0) {
+        fprintf(stderr, "too slow: %.1f tok/s (thread oversubscription?)\n", st.pieces / t_gen);
         return 1;
     }
     return 0;

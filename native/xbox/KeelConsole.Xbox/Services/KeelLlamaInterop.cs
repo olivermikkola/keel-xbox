@@ -63,7 +63,7 @@ namespace KeelConsole.Xbox.Services
             }
         }
 
-        public static void LoadModel(string modelPath, int nCtx = 2048, int nThreads = 6)
+        public static void LoadModel(string modelPath, int nCtx = 2048, int nThreads = 0)
         {
             byte[] err = new byte[512];
             IntPtr pathPtr = AllocUtf8(modelPath);

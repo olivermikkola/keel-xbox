@@ -1,3 +1,15 @@
+#if defined(_WIN32)
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#elif defined(__linux__)
+#  ifndef _GNU_SOURCE
+#    define _GNU_SOURCE
+#  endif
+#  include <sched.h>
+#endif
+
 #include "keel_llama.h"
 #include "llama.h"
 
@@ -6,6 +18,7 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -35,11 +48,58 @@ void batch_set_tokens(
     llama_batch_ext_set_output_logits(batch, n_tokens - 1, true);
 }
 
+// Logical CPUs this process may actually run on. hardware_concurrency() reports the
+// whole machine, but an Xbox app only gets a share of the console's cores (and a CI
+// VM or `taskset` may restrict it too). Running more llama.cpp threads than that
+// makes the spinning workers starve each other: decode drops ~100x (measured).
+int32_t usable_cpus() {
+#if defined(_WIN32)
+    ULONG len = 0;
+    GetSystemCpuSetInformation(nullptr, 0, &len, GetCurrentProcess(), 0);
+    if (len > 0) {
+        std::vector<uint8_t> buf(len);
+        auto * info = reinterpret_cast<SYSTEM_CPU_SET_INFORMATION *>(buf.data());
+        if (GetSystemCpuSetInformation(info, len, &len, GetCurrentProcess(), 0)) {
+            int32_t count = 0;
+            for (ULONG off = 0; off < len;) {
+                auto * e = reinterpret_cast<SYSTEM_CPU_SET_INFORMATION *>(buf.data() + off);
+                if (e->Type == CpuSetInformation) {
+                    const auto & cs = e->CpuSet;
+                    const bool taken_by_other = cs.Allocated && !cs.AllocatedToTargetProcess;
+                    if (!taken_by_other && !cs.Parked && !cs.RealTime) ++count;
+                }
+                if (e->Size == 0) break;
+                off += e->Size;
+            }
+            if (count > 0) return count;
+        }
+    }
+#elif defined(__linux__)
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    if (sched_getaffinity(0, sizeof(set), &set) == 0) {
+        const int n = CPU_COUNT(&set);
+        if (n > 0) return n;
+    }
+#endif
+    const unsigned hw = std::thread::hardware_concurrency();
+    return hw > 0 ? static_cast<int32_t>(hw) : 1;
+}
+
+// Threads used when the caller passes n_threads <= 0: leave one usable core for the
+// UI / system when there are spare ones, and cap at 4 (small models gain nothing more).
+int32_t pick_default_threads() {
+    const int32_t cpus = usable_cpus();
+    if (cpus <= 2) return cpus;
+    return std::clamp<int32_t>(cpus - 1, 1, 4);
+}
+
 void free_locked() {
     if (g_ctx) {
         llama_free(g_ctx);
         g_ctx = nullptr;
     }
+
     if (g_model) {
         llama_model_free(g_model);
         g_model = nullptr;
@@ -92,10 +152,9 @@ KEEL_API int32_t KEEL_CALL keel_llama_load(
     llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx = static_cast<uint32_t>(std::max<int32_t>(512, n_ctx));
     cparams.n_batch = std::min<uint32_t>(cparams.n_ctx, 512);
-    if (n_threads > 0) {
-        cparams.n_threads = n_threads;
-        cparams.n_threads_batch = n_threads;
-    }
+    const int32_t threads = n_threads > 0 ? n_threads : pick_default_threads();
+    cparams.n_threads = threads;
+    cparams.n_threads_batch = threads;
 
     g_ctx = llama_init_from_model(g_model, cparams);
     if (!g_ctx) {
