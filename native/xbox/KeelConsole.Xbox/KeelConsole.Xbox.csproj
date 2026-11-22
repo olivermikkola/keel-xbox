@@ -21,7 +21,8 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
     <RuntimeIdentifiers>win10-x64;win10-x64-aot</RuntimeIdentifiers>
-    <KeelEnableOrtGenAI Condition=" '$(KeelEnableOrtGenAI)' == '' ">true</KeelEnableOrtGenAI>
+    <!-- ONNX Runtime GenAI ships desktop Win32 DLLs (not AppContainer-clean); llama.cpp (KeelLlama.dll) is the default engine. -->
+    <KeelEnableOrtGenAI Condition=" '$(KeelEnableOrtGenAI)' == '' ">false</KeelEnableOrtGenAI>
     <KeelOrtGenAIVersion Condition=" '$(KeelOrtGenAIVersion)' == '' ">0.5.2</KeelOrtGenAIVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">

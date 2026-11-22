@@ -1,0 +1,59 @@
+KEEL CONSOLE (BETA) - INSTALL ON XBOX SERIES X|S
+================================================
+
+What is in this zip
+  KeelConsole.msixbundle   the app (includes the llama.cpp engine and the UI)
+  Dependencies\*.appx      Microsoft runtime packages the app needs (x64)
+  KeelDev.cer              test certificate (only needed for a Windows PC install)
+  INSTALL.txt              this file
+
+You need
+  - An Xbox Series X or Series S in Developer Mode (one time setup, below)
+  - A PC or phone on the same home network, with a web browser
+  - Internet on the Xbox (the app downloads a ~230 MB model the first time)
+
+1) Put the Xbox in Developer Mode (one time)
+   - On the Xbox, install "Xbox Dev Mode" from the Store and open it.
+   - It shows an activation code. On a PC, sign in at Partner Center
+     (https://partner.microsoft.com), open Xbox devices, and enter the code.
+     Guide: https://learn.microsoft.com/windows/uwp/xbox-apps/devkit-activation
+   - The Xbox restarts into Dev Home.
+
+2) Turn on Remote Access
+   - In Dev Home: Remote Access Settings -> enable Device Portal,
+     set a username and password.
+   - Dev Home shows the console address, e.g. https://192.168.1.50:11443
+
+3) Upload the app
+   - On your PC, open that address in a browser (accept the certificate warning,
+     it is the Xbox's own self-signed one) and log in.
+   - Home -> My games & apps -> Add.
+   - Choose KeelConsole.msixbundle -> Next.
+   - Add every .appx file from the Dependencies folder -> Next -> Start.
+   - Wait for "Package successfully registered".
+
+4) Run it
+   - Dev Home -> My games & apps -> Keel Console.
+   - Go to Models (press Y) and download "LFM2.5 350M" (the default).
+   - Press LB / RB to go back to Chat and talk to it. Everything runs on the
+     Xbox; nothing is sent to a cloud service.
+
+Controller
+   D-pad / left stick  move      A  select        B  back / stop generating
+   X  new chat         Y  models  LB/RB  switch tabs  right stick  scroll
+
+Updating
+   Upload the newer KeelConsole.msixbundle the same way. Your downloaded
+   models stay on the console.
+
+Troubleshooting
+   - "Dependency not found" while installing: you skipped step 3's
+     Dependencies files. Add them all.
+   - Model download fails: check the Xbox has internet, then retry.
+   - The app closes while loading a bigger model: UWP apps on Xbox get about
+     1 GB of memory. Use LFM2.5 350M or SmolLM2 360M.
+
+Windows 10/11 PC (optional)
+   Double-click KeelDev.cer -> Install Certificate -> Local Machine ->
+   "Trusted People". Then install the Dependencies .appx files and
+   KeelConsole.msixbundle by double-clicking them.

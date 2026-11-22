@@ -665,9 +665,9 @@ export function ModelsView({
                 <code className="font-mono text-[color:var(--keel-foam)]">
                   native/xbox/KeelConsole.Xbox
                 </code>
-                ), <code className="font-mono">keelBridge</code> enumerates ONNX /
-                GGUF weights under <code className="font-mono">LocalState</code>{" "}
-                and runs native C# / C++ inference with DirectML prefill.
+                ), the native bridge lists GGUF / ONNX weights under{" "}
+                <code className="font-mono">LocalState</code> and runs them on the
+                console with the bundled llama.cpp engine.
               </p>
               {uwpInfo && (
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">

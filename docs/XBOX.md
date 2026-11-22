@@ -39,7 +39,7 @@ Checklist to track:
 1. **WACK-clean** native binaries (`Release|x64` `.msixbundle` tested with `appcert.exe` via `native/xbox/scripts/build-and-sideload.ps1 -RunWack`; run `npm run check:store` for manifest/capability/bridge preflight).
 2. **Generative AI disclosure** — Store policy **11.16**: visible `AI-generated · Policy 11.16` indicator in Console, structured **Report AI Output** flow (reason category + optional note stored locally), and redacted JSON log export in Settings.
 3. Keep Keel clearly an **app** (not a game shell) to avoid ID@Xbox requirements unless we later add Xbox network features.
-4. Store-distributable inference via `Microsoft.ML.OnnxRuntimeGenAI.DirectML` (wired in `LocalInferenceService.cs`) plus LAN pairing with **Keel Desktop** (`UDP 18182` discovery + PIN-gated `HTTP 18181` OpenAI/SSE relay).
+4. Store-distributable inference via `KeelLlama.dll` (llama.cpp built for `WindowsStore`, AppContainer-linked); `Microsoft.ML.OnnxRuntimeGenAI.DirectML` stays opt-in because its NuGet DLLs are desktop Win32 builds. Plus LAN pairing with **Keel Desktop** (`UDP 18182` discovery + PIN-gated `HTTP 18181` OpenAI/SSE relay).
 
 ## Repo layout for the native port (next)
 

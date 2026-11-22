@@ -20,13 +20,14 @@ using Windows.System.Profile;
 namespace KeelConsole.Xbox.Services
 {
     /// <summary>
-    /// WinRT host object exposed to the WebView2 UI as
-    /// <c>window.chrome.webview.hostObjects.keelBridge</c>.
-    /// Handles LocalState ONNX Runtime GenAI inference, UDP/HTTP LAN discovery,
-    /// and private-LAN SSE proxying when running packaged in UWP without Node.js.
+    /// Native side of the Keel Console UI bridge. The WebView2 page calls it with
+    /// <c>window.chrome.webview.postMessage({ kind: "keel-rpc", id, method, args })</c>
+    /// and receives <c>{ kind: "keel-rpc-result", id, ok, result | error }</c> back.
+    /// (UWP cannot expose a plain C# object through AddHostObjectToScript; that needs
+    /// a wv2winrt C++/WinRT projection. Web messages work on Xbox without one.)
+    /// Handles LocalState llama.cpp / ONNX Runtime GenAI inference, UDP/HTTP LAN
+    /// discovery, and private-LAN SSE proxying when running packaged in UWP.
     /// </summary>
-    [AllowForWeb]
-    [ComVisible(true)]
     public sealed class KeelNativeBridge
     {
         private const string DiscoveryMagic = "KEEL_DISCOVER_V1";
@@ -42,6 +43,72 @@ namespace KeelConsole.Xbox.Services
         internal void AttachWebView(CoreWebView2 core)
         {
             _coreWebView = core;
+            core.WebMessageReceived += OnWebMessageReceived;
+        }
+
+        private void OnWebMessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            string raw;
+            try
+            {
+                raw = args.TryGetWebMessageAsString();
+            }
+            catch
+            {
+                return;
+            }
+            if (!JsonObject.TryParse(raw ?? string.Empty, out JsonObject msg)) return;
+            if (msg.GetNamedString("kind", "") != "keel-rpc") return;
+
+            string id = msg.GetNamedString("id", "");
+            string method = msg.GetNamedString("method", "");
+            JsonArray argsArr = msg.ContainsKey("args") && msg["args"].ValueType == JsonValueType.Array
+                ? msg.GetNamedArray("args")
+                : new JsonArray();
+
+            // Run off the UI thread: some calls (LAN discovery, probes) block briefly.
+            _ = Task.Run(() =>
+            {
+                var reply = new JsonObject
+                {
+                    ["kind"] = JsonValue.CreateStringValue("keel-rpc-result"),
+                    ["id"] = JsonValue.CreateStringValue(id),
+                };
+                try
+                {
+                    string result = Dispatch(method, argsArr);
+                    reply["ok"] = JsonValue.CreateBooleanValue(true);
+                    reply["result"] = result == null ? JsonValue.CreateNullValue() : JsonValue.CreateStringValue(result);
+                }
+                catch (Exception ex)
+                {
+                    reply["ok"] = JsonValue.CreateBooleanValue(false);
+                    reply["error"] = JsonValue.CreateStringValue(ex.Message);
+                }
+                PostToWeb(reply.Stringify());
+            });
+        }
+
+        private string Dispatch(string method, JsonArray args)
+        {
+            string Arg(uint i) => i < args.Count && args[(int)i].ValueType == JsonValueType.String
+                ? args.GetStringAt(i)
+                : string.Empty;
+
+            switch (method)
+            {
+                case "GetSystemInfoJson": return GetSystemInfoJson();
+                case "ListLocalModelsJson": return ListLocalModelsJson();
+                case "DiscoverLanHostsJson": return DiscoverLanHostsJson();
+                case "ProbeLocalServerJson": return ProbeLocalServerJson(Arg(0), Arg(1));
+                case "StreamServerChat": StreamServerChat(Arg(0)); return null;
+                case "StreamChat": StreamChat(Arg(0)); return null;
+                case "CancelChat": CancelChat(); return null;
+                case "CancelDownload": CancelDownload(); return null;
+                case "DeleteLocalModel": return DeleteLocalModel(Arg(0));
+                case "DownloadLocalModel": DownloadLocalModel(Arg(0)); return null;
+                default: throw new InvalidOperationException($"Unknown bridge method: {method}");
+            }
         }
 
         public string GetSystemInfoJson()

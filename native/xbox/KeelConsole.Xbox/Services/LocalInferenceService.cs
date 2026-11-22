@@ -153,7 +153,7 @@ namespace KeelConsole.Xbox.Services
                     var msgList = ParseMessageList(messagesJson);
                     lock (_modelLock)
                     {
-                        KeelLlamaInterop.LoadModel(ggufPath, nCtx: 2048, nThreads: 6);
+                        KeelLlamaInterop.LoadModel(ggufPath, nCtx: 2048, nThreads: 0);
                         KeelLlamaInterop.StreamChat(
                             msgList,
                             (float)temperature,
