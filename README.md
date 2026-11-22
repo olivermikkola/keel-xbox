@@ -4,12 +4,15 @@
 Xbox Series X|S. The model runs on the console itself with llama.cpp, or on a
 PC in your home. No cloud, no account.
 
-> **Beta.** Every merge to `main` is built, packaged and published as a
-> download automatically. It installs through Xbox Developer Mode today; a
+> **Beta.** GitHub Actions builds and packages beta downloads from `main` after checks pass. It installs through Xbox Developer Mode today; a
 > Microsoft Store listing is the goal.
 
 The release ZIP is intended for Xbox Developer Mode. See the release notes and
 the bundled setup guide for the build and its verification details.
+
+![Keel Console home screen with large TV-style navigation and controller hints](docs/console-preview.webp)
+
+*Browser capture of the bundled UI from the v0.1.19 Xbox release. The image shows the layout and controls. See release notes for runtime verification.*
 
 ## Install on Xbox
 
