@@ -90,8 +90,7 @@ export const DEFAULT_SETTINGS: KeelSettings = {
 export function loadSettings(): KeelSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   const hasUwpBridge = Boolean(
-    (window as { chrome?: { webview?: { hostObjects?: { keelBridge?: unknown } } } })
-      .chrome?.webview?.hostObjects?.keelBridge,
+    (window as { __keelUwpHost?: number }).__keelUwpHost,
   );
   const fallback: KeelSettings = hasUwpBridge
     ? { ...DEFAULT_SETTINGS, runtimeMode: "uwp-native" }

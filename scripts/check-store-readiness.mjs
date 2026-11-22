@@ -36,11 +36,23 @@ assert.match(appCs, /ApplicationRequiresPointerMode\.WhenRequested/);
 const mainCs = read("native/xbox/KeelConsole.Xbox/MainPage.xaml.cs");
 assert.match(mainCs, /AreDevToolsEnabled\s*=\s*false/);
 assert.match(mainCs, /AreDefaultContextMenusEnabled\s*=\s*false/);
+// UWP cannot project a plain C# object via AddHostObjectToScript (needs wv2winrt);
+// the UI must talk to native code over WebView2 web messages instead.
+assert.ok(!/AddHostObjectToScript/.test(mainCs), "MainPage must not use AddHostObjectToScript on UWP");
+assert.match(mainCs, /__keelUwpHost/, "MainPage must flag the UWP host for the UI");
+const bridgeCs = read("native/xbox/KeelConsole.Xbox/Services/KeelNativeBridge.cs");
+assert.match(bridgeCs, /WebMessageReceived/, "Native bridge must listen for WebView2 web messages");
+for (const method of ["GetSystemInfoJson", "ListLocalModelsJson", "StreamChat", "DownloadLocalModel", "DeleteLocalModel"]) {
+  assert.match(bridgeCs, new RegExp(`case "${method}"`), `Bridge RPC dispatch is missing ${method}`);
+}
 
 // 3. Native UWP ORT GenAI + DirectML + 2 GiB ceiling checks
 const csproj = read("native/xbox/KeelConsole.Xbox/KeelConsole.Xbox.csproj");
 assert.match(csproj, /Microsoft\.ML\.OnnxRuntimeGenAI\.DirectML/);
 assert.match(csproj, /UseDotNetNativeToolchain>true<\/UseDotNetNativeToolchain>/);
+// Release packages are llama.cpp-only; ORT GenAI (desktop Win32 DLLs) stays opt-in.
+assert.match(csproj, /KeelEnableOrtGenAI Condition="[^"]*">false</, "ORT GenAI must be off by default");
+assert.match(csproj, /Content Include="KeelLlama\.dll"/, "KeelLlama.dll must be packaged");
 
 const infCs = read("native/xbox/KeelConsole.Xbox/Services/LocalInferenceService.cs");
 assert.match(infCs, /SingleFileCeilingBytes\s*=\s*2048UL\s*\*\s*1024UL\s*\*\s*1024UL/);

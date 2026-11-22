@@ -22,7 +22,7 @@ const STEPS = [
   {
     code: "02 · NATIVE/XBOX",
     title: "UWP Dev Mode Shell",
-    body: "native/xbox/KeelConsole.Xbox hosts this exact UI in WebView2 with ApplicationViewScaling disabled for crisp 1080p/4K TV rendering, XY mouse-mode off, and a WinRT keelBridge for LocalState ONNX Runtime GenAI & llama.cpp.",
+    body: "native/xbox/KeelConsole.Xbox hosts this exact UI in WebView2 with ApplicationViewScaling disabled for crisp 1080p/4K TV rendering, XY mouse-mode off, and a WebView2 message bridge to on-console llama.cpp (and ONNX Runtime GenAI).",
   },
   {
     code: "03 · MICROSOFT STORE",

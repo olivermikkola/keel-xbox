@@ -40,6 +40,13 @@ add_library(KeelLlama SHARED
 target_compile_definitions(KeelLlama PRIVATE KEEL_LLAMA_EXPORTS)
 target_link_libraries(KeelLlama PRIVATE llama ggml)
 
-if(MSVC)
+if(MSVC AND CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
   target_link_options(KeelLlama PRIVATE /APPCONTAINER)
+endif()
+
+# Host smoke test (Linux/Windows desktop): same keel_llama API the Xbox app calls.
+option(KEEL_LLAMA_SMOKE "Build the keel_llama_smoke host test" OFF)
+if(KEEL_LLAMA_SMOKE)
+  add_executable(keel_llama_smoke smoke/keel_llama_smoke.c)
+  target_link_libraries(keel_llama_smoke PRIVATE KeelLlama)
 endif()

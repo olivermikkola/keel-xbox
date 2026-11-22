@@ -5,7 +5,27 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
+  xllama-smoke:
+    name: xllama smoke (real GGUF, Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build KeelLlama + smoke test against pinned llama.cpp
+        run: |
+          cmake -S native/xbox/KeelLlama -B build-smoke -DCMAKE_BUILD_TYPE=Release \
+            -DKEEL_LLAMA_SMOKE=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          cmake --build build-smoke -j"$(nproc)"
+      - name: Download the app's default model (LFM2.5 350M Q4_K_M)
+        run: |
+          curl -fL --retry 4 -o model.gguf \
+            https://huggingface.co/LiquidAI/LFM2.5-350M-GGUF/resolve/main/LFM2.5-350M-Q4_K_M.gguf
+      - name: Load + chat through the exact API the Xbox app calls
+        run: ./build-smoke/keel_llama_smoke model.gguf
+
   web:
     name: Next.js app (test, lint, build)
     runs-on: ubuntu-latest
@@ -44,6 +64,19 @@ jobs:
           $chosen = if ($versions -contains "10.0.22621.0") { "10.0.22621.0" } else { $versions[0] }
           Write-Host "Using TargetPlatformVersion=$chosen"
           "version=$chosen" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Stamp package version (0.1.<run number>.0)
+        id: ver
+        shell: pwsh
+        run: |
+          $version = "0.1.${{ github.run_number }}.0"
+          $manifest = "native/xbox/KeelConsole.Xbox/Package.appxmanifest"
+          (Get-Content $manifest -Raw) -replace 'Version="0\.1\.0\.0"', "Version=""$version""" |
+            Set-Content $manifest -NoNewline
+          if (-not (Select-String -Path $manifest -SimpleMatch -Pattern "Version=""$version""" -Quiet)) {
+            throw "Failed to stamp manifest version"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Export static UI bundle for UWP WebView2
         run: |
@@ -104,9 +137,77 @@ jobs:
             Remove-Item -Force $pfxPath -ErrorAction SilentlyContinue
           }
 
-      - name: Upload Xbox Dev Mode sideload package
+      - name: Assemble Xbox install zip (app + x64 dependencies + instructions)
+        shell: pwsh
+        run: |
+          $version = "${{ steps.ver.outputs.version }}"
+          $src = Get-ChildItem native/xbox/AppPackages -Directory | Where-Object Name -like "KeelConsole.Xbox_*_Test" | Select-Object -First 1
+          if (-not $src) { throw "No AppPackages output folder" }
+          $bundle = Get-ChildItem $src.FullName -Filter *.msixbundle | Select-Object -First 1
+          if (-not $bundle) { throw "No .msixbundle produced" }
+          $stage = Join-Path $env:RUNNER_TEMP "KeelConsole-Xbox-x64-$version"
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "Dependencies") | Out-Null
+          Copy-Item $bundle.FullName (Join-Path $stage "KeelConsole.msixbundle")
+          Copy-Item (Join-Path $src.FullName "Dependencies\x64\*.appx") (Join-Path $stage "Dependencies")
+          Copy-Item native/xbox/AppPackages/KeelDev.cer (Join-Path $stage "KeelDev.cer")
+          Copy-Item docs/INSTALL-XBOX.txt (Join-Path $stage "INSTALL.txt")
+
+          # The package must actually carry the llama.cpp engine and the UI.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $outer = [IO.Compression.ZipFile]::OpenRead($bundle.FullName)
+          $msixEntry = $outer.Entries | Where-Object { $_.Name -like "*.msix" } | Select-Object -First 1
+          $tmpMsix = Join-Path $env:RUNNER_TEMP "inner.msix"
+          [IO.Compression.ZipFileExtensions]::ExtractToFile($msixEntry, $tmpMsix, $true)
+          $outer.Dispose()
+          $inner = [IO.Compression.ZipFile]::OpenRead($tmpMsix)
+          $names = $inner.Entries | ForEach-Object FullName
+          $inner.Dispose()
+          foreach ($required in @("KeelLlama.dll", "ui/index.html", "KeelConsole.Xbox.exe")) {
+            if ($names -notcontains $required) { throw "Package is missing $required" }
+          }
+          Write-Host "Package contents OK:" ($names | Where-Object { $_ -notlike "ui/*" -and $_ -notlike "Assets/*" }) -Separator "`n  "
+
+          $zip = Join-Path $env:RUNNER_TEMP "KeelConsole-Xbox-x64-$version.zip"
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          "ZIP_PATH=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "STAGE_DIR=$stage" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Xbox install package (workflow artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: keel-console-xbox-x64
-          path: native/xbox/AppPackages/
+          name: KeelConsole-Xbox-x64-${{ steps.ver.outputs.version }}
+          path: ${{ env.STAGE_DIR }}
           if-no-files-found: error
+
+      - name: Upload release zip for the publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: ${{ env.ZIP_PATH }}
+          if-no-files-found: error
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+
+  release:
+    name: Publish beta release (main only)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [xllama-smoke, web, uwp-xbox]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zip
+          path: dist
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.uwp-xbox.outputs.version }}
+        run: |
+          tag="v${VERSION%.0}"
+          gh release create "$tag" dist/*.zip \
+            --target "$GITHUB_SHA" \
+            --title "Keel Console ${VERSION%.0} (beta)" \
+            --notes-file docs/RELEASE-NOTES-TEMPLATE.md

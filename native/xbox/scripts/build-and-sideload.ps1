@@ -10,7 +10,7 @@
 param(
   [ValidateSet("Debug", "Release")]
   [string]$Configuration = "Release",
-  [bool]$EnableOrtGenAI = $true,
+  [bool]$EnableOrtGenAI = $false,
   [switch]$RunWack,
   [string]$XboxIp = "",
   [int]$XboxPortalPort = 11443,

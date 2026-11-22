@@ -29,35 +29,101 @@ type KeelNativeHostObject = {
   DeleteLocalModel?: (fileName: string) => Promise<string> | string;
 };
 
+type WebViewMessageListener = (event: { data: unknown }) => void;
+
 declare global {
   interface Window {
+    /** Set by the UWP shell (MainPage.xaml.cs) before any page script runs. */
+    __keelUwpHost?: number;
     chrome?: {
       webview?: {
-        hostObjects?: {
-          keelBridge?: KeelNativeHostObject;
-        };
-        addEventListener?: (
-          type: string,
-          listener: (event: { data: unknown }) => void,
-        ) => void;
-        removeEventListener?: (
-          type: string,
-          listener: (event: { data: unknown }) => void,
-        ) => void;
+        postMessage?: (message: unknown) => void;
+        addEventListener?: (type: string, listener: WebViewMessageListener) => void;
+        removeEventListener?: (type: string, listener: WebViewMessageListener) => void;
       };
     };
   }
 }
 
+/**
+ * UWP cannot expose a C# object to script via AddHostObjectToScript (that needs a
+ * wv2winrt C++/WinRT projection), so the shell speaks a tiny RPC over WebView2 web
+ * messages instead. This builds an object with the same method names on top of it.
+ */
+let cachedBridge: KeelNativeHostObject | null = null;
+
+function createRpcBridge(): KeelNativeHostObject {
+  const webview = window.chrome!.webview!;
+  const pending = new Map<
+    string,
+    { resolve: (value: string) => void; reject: (err: Error) => void }
+  >();
+  let seq = 0;
+
+  webview.addEventListener?.("message", (event) => {
+    let msg: Record<string, unknown> | null = null;
+    try {
+      msg =
+        typeof event.data === "string"
+          ? (JSON.parse(event.data) as Record<string, unknown>)
+          : (event.data as Record<string, unknown>);
+    } catch {
+      return;
+    }
+    if (!msg || msg.kind !== "keel-rpc-result" || typeof msg.id !== "string") return;
+    const entry = pending.get(msg.id);
+    if (!entry) return;
+    pending.delete(msg.id);
+    if (msg.ok) {
+      entry.resolve(typeof msg.result === "string" ? msg.result : "");
+    } else {
+      entry.reject(new Error(String(msg.error ?? "Keel bridge call failed")));
+    }
+  });
+
+  const call = (method: string, ...args: string[]) =>
+    new Promise<string>((resolve, reject) => {
+      seq += 1;
+      const id = `rpc-${Date.now()}-${seq}`;
+      pending.set(id, { resolve, reject });
+      try {
+        webview.postMessage!(JSON.stringify({ kind: "keel-rpc", id, method, args }));
+      } catch (err) {
+        pending.delete(id);
+        reject(err instanceof Error ? err : new Error("postMessage failed"));
+      }
+    });
+
+  return {
+    GetSystemInfoJson: () => call("GetSystemInfoJson"),
+    ListLocalModelsJson: () => call("ListLocalModelsJson"),
+    StreamChat: (requestJson) => call("StreamChat", requestJson),
+    CancelChat: () => call("CancelChat").then(() => undefined),
+    DiscoverLanHostsJson: () => call("DiscoverLanHostsJson"),
+    ProbeLocalServerJson: (baseUrl, pairingCode) =>
+      call("ProbeLocalServerJson", baseUrl, pairingCode),
+    StreamServerChat: (requestJson) => call("StreamServerChat", requestJson),
+    DownloadLocalModel: (requestJson) =>
+      call("DownloadLocalModel", requestJson).then(() => undefined),
+    CancelDownload: () => call("CancelDownload").then(() => undefined),
+    DeleteLocalModel: (fileName) => call("DeleteLocalModel", fileName),
+  };
+}
+
+function getBridge(): KeelNativeHostObject | null {
+  if (!isUwpHostAvailable()) return null;
+  if (!cachedBridge) cachedBridge = createRpcBridge();
+  return cachedBridge;
+}
+
 export function isUwpHostAvailable(): boolean {
   if (typeof window === "undefined") return false;
-  return Boolean(window.chrome?.webview?.hostObjects?.keelBridge);
+  return Boolean(window.__keelUwpHost && window.chrome?.webview?.postMessage);
 }
 
 export async function getUwpSystemInfo(): Promise<UwpSystemInfo | null> {
-  if (!isUwpHostAvailable()) return null;
-  const bridge = window.chrome!.webview!.hostObjects!.keelBridge!;
-  if (!bridge.GetSystemInfoJson) return null;
+  const bridge = getBridge();
+  if (!bridge?.GetSystemInfoJson) return null;
   try {
     const raw = await bridge.GetSystemInfoJson();
     return JSON.parse(raw) as UwpSystemInfo;
@@ -67,9 +133,8 @@ export async function getUwpSystemInfo(): Promise<UwpSystemInfo | null> {
 }
 
 export async function listUwpLocalModels(): Promise<UwpLocalModelEntry[]> {
-  if (!isUwpHostAvailable()) return [];
-  const bridge = window.chrome!.webview!.hostObjects!.keelBridge!;
-  if (!bridge.ListLocalModelsJson) return [];
+  const bridge = getBridge();
+  if (!bridge?.ListLocalModelsJson) return [];
   try {
     const raw = await bridge.ListLocalModelsJson();
     const parsed = JSON.parse(raw) as UwpLocalModelEntry[];
@@ -92,7 +157,7 @@ export async function streamUwpInference(
   },
 ): Promise<void> {
   const webview = window.chrome?.webview;
-  const bridge = webview?.hostObjects?.keelBridge;
+  const bridge = getBridge();
   if (!bridge?.StreamChat) {
     throw new Error("UWP native bridge is not attached in this browser session.");
   }
@@ -146,9 +211,8 @@ export async function streamUwpInference(
 }
 
 export async function discoverUwpLanHosts(): Promise<unknown[]> {
-  if (!isUwpHostAvailable()) return [];
-  const bridge = window.chrome!.webview!.hostObjects!.keelBridge!;
-  if (!bridge.DiscoverLanHostsJson) return [];
+  const bridge = getBridge();
+  if (!bridge?.DiscoverLanHostsJson) return [];
   try {
     const raw = await bridge.DiscoverLanHostsJson();
     const parsed = JSON.parse(raw) as unknown;
@@ -169,9 +233,8 @@ export async function probeUwpLocalServer(
   requiresPin?: boolean;
   error?: string;
 } | null> {
-  if (!isUwpHostAvailable()) return null;
-  const bridge = window.chrome!.webview!.hostObjects!.keelBridge!;
-  if (!bridge.ProbeLocalServerJson) return null;
+  const bridge = getBridge();
+  if (!bridge?.ProbeLocalServerJson) return null;
   try {
     const raw = await bridge.ProbeLocalServerJson(baseUrl, pairingCode);
     return JSON.parse(raw);
@@ -198,7 +261,7 @@ export async function streamUwpServerChat(
   },
 ): Promise<void> {
   const webview = window.chrome?.webview;
-  const bridge = webview?.hostObjects?.keelBridge;
+  const bridge = getBridge();
   if (!bridge?.StreamServerChat) {
     throw new Error("UWP LAN chat bridge is unavailable.");
   }
@@ -258,7 +321,7 @@ export async function downloadUwpLocalModel(
   signal?: AbortSignal,
 ): Promise<void> {
   const webview = window.chrome?.webview;
-  const bridge = webview?.hostObjects?.keelBridge;
+  const bridge = getBridge();
   if (!bridge?.DownloadLocalModel) {
     throw new Error("UWP download bridge is unavailable.");
   }
@@ -312,7 +375,7 @@ export async function downloadUwpLocalModel(
 }
 
 export async function deleteUwpLocalModel(fileName: string): Promise<void> {
-  const bridge = window.chrome?.webview?.hostObjects?.keelBridge;
+  const bridge = getBridge();
   if (!bridge?.DeleteLocalModel) return;
   const raw = await bridge.DeleteLocalModel(fileName);
   const parsed = JSON.parse(raw) as { ok?: boolean; error?: string };

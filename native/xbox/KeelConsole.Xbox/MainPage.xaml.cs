@@ -33,7 +33,8 @@ namespace KeelConsole.Xbox
             core.Settings.AreDevToolsEnabled = false;
 
             _bridge.AttachWebView(core);
-            core.AddHostObjectToScript("keelBridge", _bridge);
+            // Tell the UI it is running inside the packaged UWP/Xbox shell before any page script runs.
+            await core.AddScriptToExecuteOnDocumentCreatedAsync("window.__keelUwpHost = 1;");
 
             // Prefer packaged static web export (Assets\ui) when bundled for Store/Dev Mode;
             // fall back to local dev server when iterating on UI from a dev host.
