@@ -8,6 +8,9 @@ PC in your home. No cloud, no account.
 > download automatically. It installs through Xbox Developer Mode today; a
 > Microsoft Store listing is the goal.
 
+The release ZIP is intended for Xbox Developer Mode. See the release notes and
+the bundled setup guide for the build and its verification details.
+
 ## Install on Xbox
 
 **[⬇ Download the latest build](https://github.com/olivermikkola/keel-xbox/releases/latest)**
@@ -102,6 +105,11 @@ One engine, focused surfaces. The canonical positioning is the
 | --- | --- |
 | [Keel](https://github.com/olivermikkola/keel) | CLI + TUI coding agent for small local models |
 | [Keel Desktop](https://github.com/olivermikkola/keel-desktop) | Everyday local-AI app: Chat, Work, Images, Code. Can share its model with this app over your home network |
-| [Keel Mobile](https://github.com/olivermikkola/keel-mobile) | Standalone on-device iPhone agent |
+| [Keel Mobile](https://moesystems.com/keel-mobile/) | Standalone on-device iPhone agent |
+| [Keel Mobile for Android](https://github.com/olivermikkola/keel-mobile-android) | On-device Android agent, source-build pre-alpha |
 | **Keel Console** (this repo) | Living-room app for Xbox / TV |
 | [Keel Arena](https://github.com/olivermikkola/keel-arena) | Public benchmarks and scorecards, the proof layer |
+
+## Reuse
+
+The repository currently has no project-wide license. Check the applicable terms before reusing source or release assets.
