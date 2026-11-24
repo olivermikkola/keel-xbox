@@ -102,11 +102,11 @@ and [`docs/XBOX.md`](docs/XBOX.md) (hardware limits and the Store plan).
 ## The Keel family
 
 One engine, focused surfaces. The canonical positioning is the
-[Keel product vision](https://github.com/olivermikkola/keel/blob/main/docs/VISION.md).
+[Keel product vision](https://github.com/olivermikkola/keel-code/blob/main/docs/VISION.md).
 
 | Product | What it is |
 | --- | --- |
-| [Keel](https://github.com/olivermikkola/keel) | CLI + TUI coding agent for small local models |
+| [Keel Code](https://github.com/olivermikkola/keel-code) | CLI + TUI coding agent (`keel`) for small local models |
 | [Keel Desktop](https://github.com/olivermikkola/keel-desktop) | Everyday local-AI app: Chat, Work, Images, Code. Can share its model with this app over your home network |
 | [Keel Mobile](https://moesystems.com/keel-mobile/) | Standalone on-device iPhone agent |
 | [Keel Mobile for Android](https://github.com/olivermikkola/keel-mobile-android) | On-device Android agent, source-build pre-alpha |
